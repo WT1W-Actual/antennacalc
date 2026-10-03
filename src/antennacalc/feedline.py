@@ -75,3 +75,31 @@ def power_at_antenna(
         total_loss_db=total,
         power_at_antenna_w=tx_power_w / 10 ** (total / 10),
     )
+
+
+@dataclass(frozen=True)
+class FeedlineConfig:
+    """Cable description that can be evaluated at any frequency."""
+
+    cable: str
+    length: float
+    length_in_meters: bool = False
+    swr: float = 1.0
+    connector_loss_db: float = 0.0
+    custom_db_per_100ft: float = 0.0
+
+    def per_100ft(self, freq_mhz: float) -> float:
+        if self.cable == CUSTOM:
+            return self.custom_db_per_100ft
+        return loss_per_100ft(self.cable, freq_mhz)
+
+    def evaluate(self, freq_mhz: float) -> FeedlineResult:
+        return power_at_antenna(
+            1.0, self.length, self.per_100ft(freq_mhz), self.swr,
+            self.connector_loss_db, self.length_in_meters,
+        )
+
+    def describe(self) -> str:
+        unit = "m" if self.length_in_meters else "ft"
+        cable = "custom cable" if self.cable == CUSTOM else self.cable
+        return f"{cable}, {self.length:g} {unit}, SWR {self.swr:g}, connectors {self.connector_loss_db:g} dB"
