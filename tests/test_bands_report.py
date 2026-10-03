@@ -69,22 +69,50 @@ def test_evaluate_validation():
 def test_report_single_and_multi():
     s = station()
     one = build_report(s, [evaluate(s, 14.2)], datetime(2026, 1, 2, 3, 4))
-    assert "SUMMARY" not in one
-    assert "CONTROLLED ENVIRONMENT (6 minute average)" in one
-    assert "UNCONTROLLED ENVIRONMENT (30 minute average)" in one
+    assert one.startswith("<!DOCTYPE html>")
+    assert "Summary" not in one
+    assert "Controlled environment" in one and "Uncontrolled environment" in one
+    assert "(6 minute average)" in one and "(30 minute average)" in one
     assert "2026-01-02 03:04" in one
+    assert "http://" not in one and "https://" not in one  # fully self-contained
 
     sel = [bands.by_name(n) for n in ("20 m", "2 m", "70 cm")]
     evs = [evaluate(s, b.eval_freq_mhz, b) for b in sel]
     multi = build_report(s, evs, datetime(2026, 1, 2))
-    assert "SUMMARY" in multi
+    assert "Summary: minimum safe distance" in multi
     for b in sel:
-        assert f"BAND: {b.label}" in multi
-    assert multi.count("UNCONTROLLED ENVIRONMENT (30 minute average)") == 3
-    assert multi.isascii()
-    assert all(len(line) <= 90 for line in multi.splitlines())
+        assert f"Band: {b.label}" in multi
+    assert multi.count("Uncontrolled environment") == 3
+    assert multi.count('<div class="band">') == 3
+
+
+def test_report_is_well_formed_html():
+    from html.parser import HTMLParser
+
+    s = station()
+    evs = [evaluate(s, b.eval_freq_mhz, b) for b in bands.BANDS]
+    stack = []
+    void = {"meta"}
+
+    class P(HTMLParser):
+        def handle_starttag(self, tag, attrs):
+            if tag not in void:
+                stack.append(tag)
+
+        def handle_endtag(self, tag):
+            assert stack and stack.pop() == tag, tag
+
+    P().feed(build_report(s, evs))
+    assert stack == []
+
+
+def test_report_escapes_user_text():
+    s = station(antenna="<script>alert(1)</script>")
+    out = build_report(s, [evaluate(s, 14.2)])
+    assert "<script>" not in out
+    assert "&lt;script&gt;" in out
 
 
 def test_report_warns_when_too_close():
     s = station(tx_power_w=0.01, gain_dbi=-10)
-    assert "WARNING" in build_report(s, [evaluate(s, 146.0)])
+    assert "Warning:" in build_report(s, [evaluate(s, 146.0)])

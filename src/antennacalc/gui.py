@@ -385,9 +385,9 @@ class App(ttk.Frame):
         if self.station is None or not self.evaluations:
             return
         path = filedialog.asksaveasfilename(
-            parent=self, title="Save report", defaultextension=".txt",
-            initialfile="antennacalc-report.txt",
-            filetypes=[("Text files", "*.txt"), ("All files", "*.*")])
+            parent=self, title="Save report", defaultextension=".html",
+            initialfile="antennacalc-report.html",
+            filetypes=[("HTML files", "*.html"), ("All files", "*.*")])
         if not path:
             return
         try:

@@ -89,39 +89,20 @@ the averaging period is 30 minutes.
 
 ### Saving a report
 
-After calculating, press **Save report…** to write a formatted plain-text (`.txt`) file.
+After calculating, press **Save report…** to write a formatted, self-contained HTML
+(`.html`) file. Open it in any web browser, or print it / save it as PDF from the browser.
 The report always covers everything you just calculated:
 
 - **One band or frequency:** a header, the station inputs, and one results section.
 - **Several bands:** one consolidated file with the station inputs, a summary table of
-  minimum safe distances for every band, then a full section for each band with the
-  controlled and uncontrolled results, one value per line.
+  minimum safe distances for every band (each row links to that band's section), then a
+  full section for each band.
 
-The report is plain ASCII, so it opens cleanly in any editor. It ends with the
-disclaimer, and flags any distance under 20 cm.
-
-Example (abridged):
-
-```
-========================================================================
-                       ANTENNA RF EXPOSURE REPORT
-========================================================================
-Generated:                        2026-10-03 15:40
-Frequencies evaluated:            3
-
-SUMMARY - MINIMUM SAFE DISTANCE (feet)
-  Band                             MHz      Controlled    Uncontrolled
-  20 m (14-14.35 MHz)            14.35         1.14 ft         1.98 ft
-  2 m (144-148 MHz)                144         1.82 ft         3.14 ft
-  70 cm (420-450 MHz)              420         1.11 ft         1.92 ft
-
-BAND: 20 m (14-14.35 MHz)
-Frequency evaluated:              14.35 MHz
-...
-CONTROLLED ENVIRONMENT (6 minute average)
-  Max allowed power density:        4.37 mW/cm^2
-  Minimum safe distance (feet):     1.14 ft
-```
+Each band section lists the frequency evaluated, power at the antenna, and color-coded
+controlled (blue) and uncontrolled (orange) panels with one value per line and the minimum
+safe distances in bold. The report ends with the disclaimer and flags any distance under
+20 cm. It uses inline styling only (no external files, scripts or network access), and
+all text is escaped.
 
 ## How it calculates
 
@@ -143,7 +124,7 @@ CONTROLLED ENVIRONMENT (6 minute average)
 | `src/antennacalc/calc.py` | Exposure math and mode duty cycles (no GUI). |
 | `src/antennacalc/bands.py` | US amateur band list and each band's evaluation frequency. |
 | `src/antennacalc/evaluate.py` | Evaluates a station at a frequency (loss, power, both environments). |
-| `src/antennacalc/report.py` | Builds the plain-text report. |
+| `src/antennacalc/report.py` | Builds the self-contained HTML report. |
 | `src/antennacalc/feedline.py` | Cable loss, SWR loss, connector loss. |
 | `src/antennacalc/antennas.py` | Antenna presets. |
 | `src/antennacalc/gui.py` | Tkinter interface. |
