@@ -91,12 +91,13 @@ antennacalc
 
 ## Publishing a release
 
-Pushing a tag that starts with `v` runs the workflow, builds all three apps, and attaches
+Pushing a tag that starts with `v` (matching the version in `pyproject.toml` and
+`src/antennacalc/__init__.py`, which you should bump first) runs the workflow, builds all three apps, and attaches
 them to a GitHub release:
 
 ```
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.2.0
+git push origin v0.2.0
 ```
 
 Pushes to `main` and pull requests run the tests and build, with the apps available as
