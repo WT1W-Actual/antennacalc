@@ -11,8 +11,10 @@ from .antennas import ANTENNAS, by_name
 from .bands import BANDS, Band
 from .evaluate import Evaluation, Station, evaluate
 from .feedline import FeedlineConfig
+from .helptext import HELP_TEXT, HELP_TITLE, HINTS
 from .report import FORMATS, format_for_path, render_report
 from .reveal import reveal, reveal_label
+from .tooltip import Tooltip
 
 RESULT_FIELDS = [
     ("tx", "Transmitter power"),
@@ -193,43 +195,55 @@ class App(ttk.Frame):
         self.save_btn.state(["disabled"])
 
     def _build_inputs(self, parent: ttk.Frame) -> None:
-        def row(r: int, label: str, widget: tk.Widget) -> None:
-            ttk.Label(parent, text=label).grid(row=r, column=0, sticky="w", pady=3)
+        def row(r: int, label: str, widget: tk.Widget, hint: str = "") -> None:
+            lbl = ttk.Label(parent, text=label)
+            lbl.grid(row=r, column=0, sticky="w", pady=3)
             widget.grid(row=r, column=1, sticky="ew", pady=3, padx=(8, 0))
+            if hint:
+                Tooltip(lbl, HINTS[hint])
+                Tooltip(widget, HINTS[hint])
 
         ant = ttk.Combobox(
             parent, textvariable=self.antenna, state="readonly", width=40,
             values=[a.name for a in ANTENNAS],
         )
         ant.bind("<<ComboboxSelected>>", self._antenna_changed)
-        row(0, "Antenna type", ant)
-        row(1, "Transmitter power (W)", ttk.Entry(parent, textvariable=self.power))
+        row(1, "Antenna type", ant, "antenna")
+        row(2, "Transmitter power (W)", ttk.Entry(parent, textvariable=self.power), "power")
 
         lf = ttk.Frame(parent)
         ttk.Entry(lf, textvariable=self.loss).pack(side="left", fill="x", expand=True)
-        ttk.Button(lf, text="Estimate…", command=self._open_feedline).pack(
-            side="left", padx=(6, 0))
-        row(2, "Feedline loss (dB)", lf)
+        est = ttk.Button(lf, text="Estimate…", command=self._open_feedline)
+        est.pack(side="left", padx=(6, 0))
+        Tooltip(est, HINTS["estimate"])
+        row(3, "Feedline loss (dB)", lf, "loss")
 
-        row(3, "Mode / duty cycle", ttk.Combobox(
+        row(4, "Mode / duty cycle", ttk.Combobox(
             parent, textvariable=self.mode, state="readonly",
-            values=list(calc.MODE_DUTY_CYCLES)))
+            values=list(calc.MODE_DUTY_CYCLES)), "mode")
 
         t = ttk.Frame(parent)
         ttk.Entry(t, textvariable=self.tx_min, width=6).pack(side="left")
         ttk.Label(t, text=" min transmit, ").pack(side="left")
         ttk.Entry(t, textvariable=self.rx_min, width=6).pack(side="left")
         ttk.Label(t, text=" min receive").pack(side="left")
-        row(4, "Transmit time", t)
+        row(5, "Transmit time", t, "tx")
 
-        row(5, "Antenna gain (dBi)", ttk.Entry(parent, textvariable=self.gain))
-        row(6, "", ttk.Checkbutton(parent, text="Include effect of ground reflection",
-                                   variable=self.ground))
+        row(6, "Antenna gain (dBi)", ttk.Entry(parent, textvariable=self.gain), "gain")
+        gf = ttk.Frame(parent)
+        gcb = ttk.Checkbutton(gf, text="Include effect of ground reflection",
+                              variable=self.ground)
+        gcb.pack(anchor="w")
+        Tooltip(gcb, HINTS["ground"])
+        ttk.Label(gf, text="Tick if people can be in the beam path\n(low, rooftop or balcony antennas).",
+                  foreground="gray40", justify="left").pack(anchor="w", padx=(22, 0))
+        row(7, "", gf)
 
         fb = ttk.LabelFrame(parent, text="Frequency", padding=8)
-        fb.grid(row=7, column=0, columnspan=2, sticky="ew", pady=(8, 4))
-        ttk.Label(fb, text="Select one or more US amateur bands:").grid(
-            row=0, column=0, columnspan=BAND_COLUMNS, sticky="w")
+        fb.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 8))
+        bl = ttk.Label(fb, text="Select one or more US amateur bands:")
+        bl.grid(row=0, column=0, columnspan=BAND_COLUMNS, sticky="w")
+        Tooltip(bl, HINTS["bands"])
         for i, b in enumerate(BANDS):
             ttk.Checkbutton(fb, text=b.name, variable=self.band_vars[b.name],
                             command=self._band_clicked).grid(
@@ -241,11 +255,22 @@ class App(ttk.Frame):
         ttk.Button(bb, text="Clear", command=self._clear_bands).pack(side="left", padx=6)
         ef = ttk.Frame(fb)
         ef.grid(row=last + 1, column=0, columnspan=BAND_COLUMNS, sticky="w")
-        ttk.Label(ef, text="or a specific frequency (MHz):").pack(side="left")
-        ttk.Entry(ef, textvariable=self.freq, width=12).pack(side="left", padx=6)
+        fl = ttk.Label(ef, text="or a specific frequency (MHz):")
+        fl.pack(side="left")
+        fe = ttk.Entry(ef, textvariable=self.freq, width=12)
+        fe.pack(side="left", padx=6)
+        Tooltip(fl, HINTS["freq"])
+        Tooltip(fe, HINTS["freq"])
 
-        ttk.Button(parent, text="Calculate", command=self.calculate).grid(
-            row=8, column=0, columnspan=2, pady=8)
+        calc_btn = ttk.Button(parent, text="Calculate", command=self.calculate)
+        calc_btn.grid(row=8, column=0, columnspan=2, pady=(8, 2))
+        reset_btn = ttk.Button(parent, text="Reset all", command=self.reset_all)
+        reset_btn.grid(row=9, column=0, columnspan=2, pady=(2, 2))
+        help_btn = ttk.Button(parent, text="Help", command=self.show_help)
+        help_btn.grid(row=10, column=0, columnspan=2, pady=(2, 8))
+        Tooltip(calc_btn, HINTS["calculate"])
+        Tooltip(reset_btn, HINTS["reset"])
+        Tooltip(help_btn, "Explains each field and how the result is calculated.")
 
     def _build_results(self, parent: ttk.Frame) -> None:
         top = ttk.Frame(parent)
@@ -254,6 +279,7 @@ class App(ttk.Frame):
         self.picker = ttk.Combobox(top, textvariable=self.shown, state="readonly", width=34)
         self.picker.pack(side="left", padx=6)
         self.picker.bind("<<ComboboxSelected>>", lambda _e: self._show())
+        Tooltip(self.picker, HINTS["picker"])
         ttk.Label(parent, textvariable=self.note, foreground="gray30",
                   wraplength=400, justify="left").grid(row=1, column=0, sticky="w", pady=(4, 0))
         self.panels = {
@@ -264,6 +290,7 @@ class App(ttk.Frame):
                   wraplength=400).grid(row=4, column=0, sticky="w")
         self.save_btn = ttk.Button(parent, text="Save report…", command=self.save_report)
         self.save_btn.grid(row=5, column=0, pady=8)
+        Tooltip(self.save_btn, HINTS["save"])
         ttk.Label(parent, text=DISCLAIMER, wraplength=400, foreground="gray40").grid(
             row=6, column=0, sticky="w", pady=(6, 0))
         parent.columnconfigure(0, weight=1)
@@ -275,9 +302,14 @@ class App(ttk.Frame):
         vars_: dict[str, tk.StringVar] = {}
         for i, (key, label) in enumerate(RESULT_FIELDS):
             vars_[key] = tk.StringVar(value="—")
-            ttk.Label(box, text=label + ":").grid(row=i, column=0, sticky="w")
+            name = ttk.Label(box, text=label + ":")
+            name.grid(row=i, column=0, sticky="w")
             ttk.Label(box, textvariable=vars_[key], font=BOLD).grid(
                 row=i, column=1, sticky="e")
+            hint = {"avg": "avg", "eirp": "eirp", "ft": "dist", "m": "dist",
+                    "loss": "loss"}.get(key)
+            if hint:
+                Tooltip(name, HINTS[hint])
         return vars_
 
     # --- frequency selection -------------------------------------------------
@@ -385,6 +417,43 @@ class App(ttk.Frame):
         self.shown.set(evals[0].label)
         self.save_btn.state(["!disabled"])
         self._show()
+
+    def show_help(self) -> None:
+        top = tk.Toplevel(self)
+        top.title(HELP_TITLE)
+        top.transient(self.winfo_toplevel())
+        top.geometry("560x480")
+        frame = ttk.Frame(top, padding=8)
+        frame.pack(fill="both", expand=True)
+        text = tk.Text(frame, wrap="word", padx=8, pady=8, relief="flat", font="TkDefaultFont")
+        bar = ttk.Scrollbar(frame, command=text.yview)
+        text.configure(yscrollcommand=bar.set)
+        bar.pack(side="right", fill="y")
+        text.pack(side="left", fill="both", expand=True)
+        text.insert("1.0", HELP_TEXT)
+        text.configure(state="disabled")
+        top.bind("<Escape>", lambda _e: top.destroy())
+
+    def reset_all(self) -> None:
+        self._clear_bands()
+        self.freq.set("")
+        self.power.set("")
+        self._setting_loss = True
+        self.loss.set("0")
+        self._setting_loss = False
+        self.feedline_cfg = None
+        self.mode.set(list(calc.MODE_DUTY_CYCLES)[0])
+        self.tx_min.set("6")
+        self.rx_min.set("4")
+        self.antenna.set(ANTENNAS[0].name)
+        self._antenna_changed()
+        self.station, self.evaluations = None, []
+        self.picker["values"] = []
+        self.shown.set("")
+        self.note.set("")
+        self.result.set("")
+        self._clear_panels()
+        self.save_btn.state(["disabled"])
 
     def _clear_panels(self) -> None:
         for panel in self.panels.values():

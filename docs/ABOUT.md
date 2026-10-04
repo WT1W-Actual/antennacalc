@@ -21,7 +21,7 @@ Fill in the form and press **Calculate**. Results appear for both exposure envir
 | Feedline loss (dB) | Total loss between transmitter and antenna. Use **Estimate…** to compute it, or enter a number (0 for none). |
 | Mode / duty cycle | How much of the time a transmission actually carries power (SSB 20%/50%, CW 40%, FM/AM/digital/carrier 100%). |
 | Transmit time | Minutes transmitting, then minutes receiving, repeating. |
-| Antenna gain (dBi) | Gain relative to an isotropic radiator. Dipole is 2.15 dBi. |
+| Antenna gain (dBi) | Gain relative to an isotropic radiator. Dipole is 2.15 dBi. Choosing an antenna type fills in a typical gain, which you can overwrite. The multiband vertical preset (about 10 m / 33 ft, DX Commander style) uses 3 dBi as a typical figure. Yagi presets (HF 2-6 elements, 6.5-12 dBi; VHF/UHF 3-15+ elements, 7.5-17 dBi) are typical free-space figures and vary by design; use the manufacturer's number when you have it. |
 | Ground reflection | Include signals reflecting off the ground. More conservative; use for low or non-directional antennas. |
 | Frequency | One or more US amateur bands, **or** a specific frequency (see below). |
 
@@ -87,6 +87,13 @@ example, you and your household once instructed in RF safety); the averaging per
 6 minutes. **Uncontrolled** applies to everyone else, such as neighbors and the public;
 the averaging period is 30 minutes.
 
+### Hints and help
+
+Hover over any field label, input, button or result line for a short explanation. The
+**Help** button opens a longer guide: how to use the app, controlled vs uncontrolled
+limits, and what affects the answer. **Reset all** returns every input and result to
+the starting defaults.
+
 ### Saving a report
 
 After calculating, press **Save report…** and pick a file type in the save dialog:
@@ -146,6 +153,8 @@ nothing is embedded; characters outside the Windows Latin-1 set print as `?`.
 | `src/antennacalc/feedline.py` | Cable loss, SWR loss, connector loss. |
 | `src/antennacalc/antennas.py` | Antenna presets. |
 | `src/antennacalc/gui.py` | Tkinter interface. |
+| `src/antennacalc/helptext.py` | Tooltip text for each field and the Help window text. |
+| `src/antennacalc/tooltip.py` | Small hover-tooltip helper. |
 | `run_antennacalc.py` | Entry script used when freezing with PyInstaller. |
 | `tests/` | pytest suite, including cases captured from the ARRL calculator. |
 | `.github/workflows/build.yml` | CI that tests and builds Windows, macOS and Linux apps. |
