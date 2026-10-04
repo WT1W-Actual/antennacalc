@@ -1,4 +1,4 @@
-"""Reports covering one or more evaluated frequencies, as HTML, plain text or PDF.
+"""Reports covering one or more evaluated frequencies, as HTML, PDF, plain text or CSV.
 
 The row helpers below hold every label and value once; each format only lays
 them out.
@@ -6,6 +6,8 @@ them out.
 
 from __future__ import annotations
 
+import csv
+import io
 import os
 import re
 import textwrap
@@ -38,8 +40,10 @@ FORMATS = {
     "html": ("HTML report", ".html"),
     "pdf": ("PDF document", ".pdf"),
     "txt": ("Plain text", ".txt"),
+    "csv": ("CSV spreadsheet", ".csv"),
 }
-_BY_EXTENSION = {".html": "html", ".htm": "html", ".pdf": "pdf", ".txt": "txt"}
+_BY_EXTENSION = {".html": "html", ".htm": "html", ".pdf": "pdf", ".txt": "txt",
+                 ".csv": "csv"}
 
 Rows = list[tuple[str, str]]
 
@@ -258,6 +262,61 @@ def build_text_report(
     return "\n".join(out)
 
 
+# --- CSV ---------------------------------------------------------------------
+
+def _csv_environment(title: str, minutes: int, r) -> dict[str, str]:
+    env = title.split()[0]  # "Controlled" / "Uncontrolled"
+    return {
+        f"{env} averaging period (min)": str(minutes),
+        f"{env} max allowed power density (mW/cm²)": f"{r.limit_mw_cm2:.4g}",
+        f"{env} time averaged power (W)": f"{r.avg_power_w:.4g}",
+        f"{env} EIRP (W)": f"{r.eirp_w:.4g}",
+        f"{env} minimum safe distance (ft)": f"{r.safe_distance_ft:.2f}",
+        f"{env} minimum safe distance (m)": f"{r.safe_distance_m:.2f}",
+    }
+
+
+def build_csv_report(
+    station: Station, evaluations: list[Evaluation], when: datetime | None = None
+) -> str:
+    """One header row, then one row per evaluated band or frequency.
+
+    Station inputs repeat on every row so each row stands alone in a spreadsheet.
+    Numbers carry no units; the units are in the column names.
+    """
+    when = when or datetime.now()
+    rows = []
+    for e in evaluations:
+        row = {
+            "Generated": when.strftime("%Y-%m-%d %H:%M"),
+            "Program": f"antennacalc {__version__}",
+            "Band": e.band.name if e.band else "",
+            "Band range": e.band.range_text if e.band else "",
+            "Frequency evaluated (MHz)": f"{e.freq_mhz:g}",
+            "Antenna type": station.antenna,
+            "Antenna gain (dBi)": f"{station.gain_dbi:g}",
+            "Transmitter power (W)": f"{station.tx_power_w:g}",
+            "Feedline": station.feedline_text(),
+            "Mode": station.mode,
+            "Duty cycle (%)": f"{station.duty_cycle * 100:g}",
+            "Transmit minutes": f"{station.tx_minutes:g}",
+            "Receive minutes": f"{station.rx_minutes:g}",
+            "Ground reflection": "yes" if station.ground else "no",
+            "Feedline loss at this frequency (dB)": f"{e.loss_db:.2f}",
+            "Power at antenna (W)": f"{e.power_at_antenna_w:.4g}",
+        }
+        for title, _css, minutes, attr in ENVIRONMENTS:
+            row.update(_csv_environment(title, minutes, getattr(e, attr)))
+        row["Under 20 cm"] = "yes" if e.too_close else "no"
+        rows.append(row)
+
+    out = io.StringIO()
+    writer = csv.DictWriter(out, fieldnames=list(rows[0]))
+    writer.writeheader()
+    writer.writerows(rows)
+    return out.getvalue()
+
+
 # --- format selection --------------------------------------------------------
 
 def format_for_path(path: str, selected: str | None = None) -> tuple[str, str]:
@@ -277,12 +336,15 @@ def render_report(
     fmt: str, station: Station, evaluations: list[Evaluation],
     when: datetime | None = None,
 ) -> bytes:
-    """The report in ``fmt`` ("html", "txt" or "pdf"), ready to write in binary mode."""
+    """The report in ``fmt`` (a key of FORMATS), ready to write in binary mode."""
     when = when or datetime.now()
     if fmt == "html":
         return build_report(station, evaluations, when).encode("utf-8")
     if fmt == "txt":
         return build_text_report(station, evaluations, when).encode("utf-8")
+    if fmt == "csv":
+        # The byte-order mark lets Excel read the file as UTF-8 (for "mW/cm²").
+        return build_csv_report(station, evaluations, when).encode("utf-8-sig")
     if fmt == "pdf":
         from .pdf_report import build_pdf_report  # imports this module's row helpers
 

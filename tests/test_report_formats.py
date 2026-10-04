@@ -1,3 +1,5 @@
+import csv
+import io
 import re
 import zlib
 from datetime import datetime
@@ -10,6 +12,7 @@ from antennacalc.pdf import string_width
 from antennacalc.report import (
     FORMATS,
     build_report,
+    build_csv_report,
     build_text_report,
     format_for_path,
     render_report,
@@ -35,6 +38,7 @@ def all_bands(s):
     ("r.html", "html"), ("r.htm", "html"), ("R.HTML", "html"),
     ("r.pdf", "pdf"), ("r.PDF", "pdf"),
     ("r.txt", "txt"), ("r.Txt", "txt"),
+    ("r.csv", "csv"), ("r.CSV", "csv"),
 ])
 def test_format_follows_extension(path, fmt):
     assert format_for_path(path) == (fmt, path)
@@ -63,7 +67,7 @@ def test_dot_in_directory_is_not_an_extension():
 
 
 def test_formats_table():
-    assert set(FORMATS) == {"html", "pdf", "txt"}
+    assert set(FORMATS) == {"html", "pdf", "txt", "csv"}
     for fmt, (label, ext) in FORMATS.items():
         assert ext == "." + fmt and label
 
@@ -122,6 +126,79 @@ def test_text_report_lines_fit_72_columns():
 def test_text_report_warns_when_too_close():
     s = station(tx_power_w=0.01, gain_dbi=-10)
     assert "WARNING:" in build_text_report(s, [evaluate(s, 146.0)], WHEN)
+
+
+# --- CSV ---------------------------------------------------------------------
+
+def read_csv(data: bytes) -> list[dict[str, str]]:
+    return list(csv.DictReader(io.StringIO(data.decode("utf-8-sig"), newline="")))
+
+
+def test_render_csv_matches_build_csv_report():
+    s = station()
+    evs = [evaluate(s, 14.2)]
+    assert render_report("csv", s, evs, WHEN) == build_csv_report(s, evs, WHEN).encode("utf-8-sig")
+
+
+def test_csv_has_one_row_per_band_with_every_field():
+    s = station()
+    evs = all_bands(s)
+    rows = read_csv(render_report("csv", s, evs, WHEN))
+    assert len(rows) == len(evs)
+    assert list(rows[0]) == [
+        "Generated", "Program", "Band", "Band range", "Frequency evaluated (MHz)",
+        "Antenna type", "Antenna gain (dBi)", "Transmitter power (W)", "Feedline",
+        "Mode", "Duty cycle (%)", "Transmit minutes", "Receive minutes",
+        "Ground reflection", "Feedline loss at this frequency (dB)", "Power at antenna (W)",
+        "Controlled averaging period (min)",
+        "Controlled max allowed power density (mW/cm²)",
+        "Controlled time averaged power (W)", "Controlled EIRP (W)",
+        "Controlled minimum safe distance (ft)", "Controlled minimum safe distance (m)",
+        "Uncontrolled averaging period (min)",
+        "Uncontrolled max allowed power density (mW/cm²)",
+        "Uncontrolled time averaged power (W)", "Uncontrolled EIRP (W)",
+        "Uncontrolled minimum safe distance (ft)", "Uncontrolled minimum safe distance (m)",
+        "Under 20 cm",
+    ]
+    for row, e in zip(rows, evs):
+        assert row["Band"] == e.band.name
+        assert row["Band range"] == e.band.range_text
+        assert float(row["Frequency evaluated (MHz)"]) == e.freq_mhz
+        assert row["Generated"] == "2026-01-02 03:04"
+        assert row["Controlled averaging period (min)"] == "6"
+        assert row["Uncontrolled averaging period (min)"] == "30"
+        assert row["Uncontrolled minimum safe distance (ft)"] == \
+            f"{e.uncontrolled.safe_distance_ft:.2f}"
+        assert row["Controlled minimum safe distance (m)"] == \
+            f"{e.controlled.safe_distance_m:.2f}"
+        assert row["Under 20 cm"] == ("yes" if e.too_close else "no")
+
+
+def test_csv_numbers_have_no_units():
+    s = station()
+    row = read_csv(render_report("csv", s, [evaluate(s, 14.2)], WHEN))[0]
+    for key, value in row.items():
+        if key.endswith(")") and "(" in key and key != "Band range":
+            float(value)  # raises if a unit or other text crept in
+
+
+def test_csv_single_frequency_leaves_band_blank():
+    s = station()
+    row = read_csv(render_report("csv", s, [evaluate(s, 14.2)], WHEN))[0]
+    assert row["Band"] == "" and row["Band range"] == ""
+    assert row["Frequency evaluated (MHz)"] == "14.2"
+    assert row["Ground reflection"] == "yes"
+
+
+def test_csv_quotes_text_with_commas_and_quotes():
+    s = station(antenna='Yagi, 3 el "boom"')
+    row = read_csv(render_report("csv", s, [evaluate(s, 14.2)], WHEN))[0]
+    assert row["Antenna type"] == 'Yagi, 3 el "boom"'
+
+
+def test_csv_starts_with_bom_for_spreadsheets():
+    s = station()
+    assert render_report("csv", s, [evaluate(s, 14.2)], WHEN).startswith(b"\xef\xbb\xbf")
 
 
 # --- PDF ---------------------------------------------------------------------

@@ -419,7 +419,7 @@ class App(ttk.Frame):
         if self.station is None or not self.evaluations:
             return
         # The chosen file type decides the format when the name has no extension;
-        # a typed .html, .pdf or .txt extension always wins.
+        # a typed .html, .pdf, .txt or .csv extension always wins.
         labels = {label: fmt for fmt, (label, _ext) in FORMATS.items()}
         chosen = tk.StringVar(self, value=FORMATS["html"][0])
         path = filedialog.asksaveasfilename(

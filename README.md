@@ -9,7 +9,7 @@ against the [ARRL RF Exposure Calculator](https://www.arrl.org/rf-exposure-calcu
 - Evaluate one or more US amateur bands (630 m through 4 mm), or a specific frequency
 - Enter transmitter power, feedline loss, mode duty cycle and transmit time
 - Built-in feedline loss estimator (cable type, length, SWR, connectors), recalculated per band
-- Save a report as HTML, PDF or plain text, consolidated across all selected bands
+- Save a report as HTML, PDF, plain text or CSV, consolidated across all selected bands
 - Python + Tkinter, no third-party runtime dependencies
 
 ## Download
