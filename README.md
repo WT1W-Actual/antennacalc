@@ -39,7 +39,8 @@ or without installing: `python -m antennacalc` with `src` on `PYTHONPATH`
 ## Tests
 
 ```
-pip install -e ".[dev]"
+pip install -r requirements-<windows|macos|linux>.txt
+pip install -e .
 pytest
 ```
 

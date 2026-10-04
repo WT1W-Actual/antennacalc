@@ -23,7 +23,8 @@ Then follow the section for your OS.
 ```powershell
 python -m venv .venv
 .venv\Scripts\Activate.ps1
-pip install -e ".[dev]"
+pip install -r requirements-windows.txt
+pip install -e .
 pytest
 python -m antennacalc                # run from source
 pyinstaller --onefile --windowed --name antennacalc --paths src run_antennacalc.py
@@ -42,7 +43,8 @@ SmartScreen may warn about an unsigned app: choose **More info → Run anyway**.
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -e ".[dev]"
+pip install -r requirements-macos.txt
+pip install -e .
 pytest
 python -m antennacalc                # run from source
 pyinstaller --windowed --name antennacalc --paths src run_antennacalc.py
@@ -70,7 +72,8 @@ choose **Open**, then **Open** again (or run `xattr -dr com.apple.quarantine ant
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -e ".[dev]"
+pip install -r requirements-linux.txt
+pip install -e .
 pytest
 python -m antennacalc                # run from source
 pyinstaller --onefile --windowed --name antennacalc --paths src run_antennacalc.py

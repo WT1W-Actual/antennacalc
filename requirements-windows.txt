@@ -1,0 +1,5 @@
+# Build + test requirements for Windows.
+# Python 3.9+ from python.org (includes Tkinter).
+#   py -m pip install -r requirements-windows.txt
+pytest>=7
+pyinstaller>=6

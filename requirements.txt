@@ -1,0 +1,6 @@
+# antennacalc runtime dependencies.
+# The app uses only the Python standard library (including Tkinter), so there is
+# nothing to pip install to run it from source.
+#
+# To build or test, use the file for your platform:
+#   requirements-windows.txt, requirements-macos.txt, requirements-linux.txt

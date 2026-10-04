@@ -1,0 +1,9 @@
+# Build + test requirements for Linux.
+# Tkinter is a system package, not a pip package:
+#   Debian/Ubuntu: sudo apt-get install python3-tk
+#   Fedora:        sudo dnf install python3-tkinter
+#   Arch:          sudo pacman -S tk
+# Then:
+#   python3 -m pip install -r requirements-linux.txt
+pytest>=7
+pyinstaller>=6

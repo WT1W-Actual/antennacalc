@@ -1,0 +1,5 @@
+# Build + test requirements for macOS.
+# Python 3.9+ with Tkinter: python.org installer, or `brew install python-tk`.
+#   python3 -m pip install -r requirements-macos.txt
+pytest>=7
+pyinstaller>=6
