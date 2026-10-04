@@ -11,7 +11,7 @@ from .antennas import ANTENNAS, by_name
 from .bands import BANDS, Band
 from .evaluate import Evaluation, Station, evaluate
 from .feedline import FeedlineConfig
-from .report import build_report
+from .report import FORMATS, format_for_path, render_report
 
 RESULT_FIELDS = [
     ("tx", "Transmitter power"),
@@ -384,15 +384,21 @@ class App(ttk.Frame):
     def save_report(self) -> None:
         if self.station is None or not self.evaluations:
             return
+        # The chosen file type decides the format when the name has no extension;
+        # a typed .html, .pdf or .txt extension always wins.
+        labels = {label: fmt for fmt, (label, _ext) in FORMATS.items()}
+        chosen = tk.StringVar(self, value=FORMATS["html"][0])
         path = filedialog.asksaveasfilename(
-            parent=self, title="Save report", defaultextension=".html",
-            initialfile="antennacalc-report.html",
-            filetypes=[("HTML files", "*.html"), ("All files", "*.*")])
+            parent=self, title="Save report", initialfile="antennacalc-report",
+            filetypes=[(label, f"*{ext}") for label, ext in FORMATS.values()],
+            typevariable=chosen)
         if not path:
             return
+        fmt, path = format_for_path(path, labels.get(chosen.get()))
         try:
-            with open(path, "w", encoding="utf-8", newline="\n") as fh:
-                fh.write(build_report(self.station, self.evaluations))
+            data = render_report(fmt, self.station, self.evaluations)
+            with open(path, "wb") as fh:
+                fh.write(data)
         except OSError as exc:
             messagebox.showerror("Save report", f"Could not save the report:\n{exc}", parent=self)
             return
