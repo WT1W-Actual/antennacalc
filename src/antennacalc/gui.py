@@ -11,7 +11,8 @@ from .antennas import ANTENNAS, by_name
 from .bands import BANDS, Band
 from .evaluate import Evaluation, Station, evaluate
 from .feedline import FeedlineConfig
-from .report import build_report
+from .report import FORMATS, format_for_path, render_report
+from .reveal import reveal, reveal_label
 
 RESULT_FIELDS = [
     ("tx", "Transmitter power"),
@@ -118,6 +119,39 @@ class FeedlineDialog(tk.Toplevel):
         if self._cfg is not None:
             self.on_use(self._cfg)
             self.destroy()
+
+
+class SavedDialog(tk.Toplevel):
+    """Confirms a save, with a button that shows the file in the system file manager."""
+
+    def __init__(self, parent: tk.Misc, path: str) -> None:
+        super().__init__(parent)
+        self.title("Save report")
+        self.resizable(False, False)
+        self.transient(parent.winfo_toplevel())
+        self.path = path
+
+        body = ttk.Frame(self, padding=12)
+        body.grid()
+        ttk.Label(body, text=f"Report saved to:\n{path}", justify="left",
+                  wraplength=420).grid(row=0, column=0, columnspan=2, sticky="w")
+        ttk.Button(body, text=reveal_label(), command=self.reveal).grid(
+            row=1, column=0, sticky="w", pady=(10, 0))
+        ok = ttk.Button(body, text="OK", command=self.destroy, default="active")
+        ok.grid(row=1, column=1, sticky="e", pady=(10, 0), padx=(8, 0))
+        body.columnconfigure(1, weight=1)
+        self.bind("<Return>", lambda _e: self.destroy())
+        self.bind("<Escape>", lambda _e: self.destroy())
+        ok.focus_set()
+
+    def reveal(self) -> None:
+        try:
+            reveal(self.path)
+        except OSError as exc:
+            messagebox.showerror("Save report", f"Could not open the folder:\n{exc}",
+                                 parent=self)
+            return
+        self.destroy()
 
 
 class App(ttk.Frame):
@@ -384,19 +418,25 @@ class App(ttk.Frame):
     def save_report(self) -> None:
         if self.station is None or not self.evaluations:
             return
+        # The chosen file type decides the format when the name has no extension;
+        # a typed .html, .pdf, .txt or .csv extension always wins.
+        labels = {label: fmt for fmt, (label, _ext) in FORMATS.items()}
+        chosen = tk.StringVar(self, value=FORMATS["html"][0])
         path = filedialog.asksaveasfilename(
-            parent=self, title="Save report", defaultextension=".html",
-            initialfile="antennacalc-report.html",
-            filetypes=[("HTML files", "*.html"), ("All files", "*.*")])
+            parent=self, title="Save report", initialfile="antennacalc-report",
+            filetypes=[(label, f"*{ext}") for label, ext in FORMATS.values()],
+            typevariable=chosen)
         if not path:
             return
+        fmt, path = format_for_path(path, labels.get(chosen.get()))
         try:
-            with open(path, "w", encoding="utf-8", newline="\n") as fh:
-                fh.write(build_report(self.station, self.evaluations))
+            data = render_report(fmt, self.station, self.evaluations)
+            with open(path, "wb") as fh:
+                fh.write(data)
         except OSError as exc:
             messagebox.showerror("Save report", f"Could not save the report:\n{exc}", parent=self)
             return
-        messagebox.showinfo("Save report", f"Report saved to:\n{path}", parent=self)
+        SavedDialog(self, path)
 
 
 def main() -> None:
