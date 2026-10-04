@@ -97,7 +97,9 @@ After calculating, press **Save report…** and pick a file type in the save dia
 - **Plain text** (`.txt`): 72 columns wide, for email or a station log.
 
 Typing a file name that ends in `.html`, `.pdf` or `.txt` picks that format regardless of
-the type selected. The report always covers everything you just calculated:
+the type selected. The confirmation that follows has a button (Show in Finder, Show in
+Explorer, or Open folder on Linux) that opens the folder holding the saved file. The report
+always covers everything you just calculated:
 
 - **One band or frequency:** a header, the station inputs, and one results section.
 - **Several bands:** one consolidated file with the station inputs, a summary table of
@@ -135,6 +137,7 @@ nothing is embedded; characters outside the Windows Latin-1 set print as `?`.
 | `src/antennacalc/report.py` | Report content shared by every format; builds the HTML and text reports and picks the format to save. |
 | `src/antennacalc/pdf_report.py` | Lays the report out as PDF pages. |
 | `src/antennacalc/pdf.py` | Minimal PDF writer (standard library only). |
+| `src/antennacalc/reveal.py` | Shows a saved file in Finder, Explorer, or the Linux file manager. |
 | `src/antennacalc/feedline.py` | Cable loss, SWR loss, connector loss. |
 | `src/antennacalc/antennas.py` | Antenna presets. |
 | `src/antennacalc/gui.py` | Tkinter interface. |
