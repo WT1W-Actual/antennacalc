@@ -6,7 +6,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from typing import Callable, Optional
 
-from . import calc, feedline
+from . import calc, feedline, regions
 from .antennas import ANTENNAS, by_name
 from .bands import BANDS, Band
 from .evaluate import Evaluation, Station, evaluate
@@ -339,7 +339,7 @@ class App(ttk.Frame):
             return float(self.freq.get())
         except ValueError:
             bands = self.selected_bands()
-            return bands[0].eval_freq_mhz if bands else None
+            return regions.DEFAULT.eval_freq_mhz(bands[0]) if bands else None
 
     # --- feedline ------------------------------------------------------------
 
@@ -379,7 +379,7 @@ class App(ttk.Frame):
         bands = self.selected_bands()
         if not bands:
             raise ValueError("Select at least one band or enter a frequency")
-        return [(b.eval_freq_mhz, b) for b in bands]
+        return [(regions.DEFAULT.eval_freq_mhz(b), b) for b in bands]
 
     def _build_station(self) -> Station:
         if self.feedline_cfg is None:

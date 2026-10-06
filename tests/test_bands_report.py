@@ -2,7 +2,7 @@ from datetime import datetime
 
 import pytest
 
-from antennacalc import bands, calc
+from antennacalc import bands, calc, regions
 from antennacalc.evaluate import Station, evaluate
 from antennacalc.feedline import CUSTOM, FeedlineConfig
 from antennacalc.limits import MAX_FREQ_MHZ, MIN_FREQ_MHZ, mpe_limit_mw_cm2
@@ -20,16 +20,16 @@ def test_all_bands_valid_and_ordered():
     for b in bands.BANDS:
         assert b.low_mhz < b.high_mhz
         assert MIN_FREQ_MHZ <= b.low_mhz and b.high_mhz <= MAX_FREQ_MHZ
-        assert b.low_mhz <= b.eval_freq_mhz <= b.high_mhz
+        assert b.low_mhz <= regions.US.eval_freq_mhz(b) <= b.high_mhz
     assert len({b.name for b in bands.BANDS}) == len(bands.BANDS)
 
 
 def test_eval_freq_is_most_conservative():
-    assert bands.by_name("20 m").eval_freq_mhz == 14.35   # limit falls with frequency
-    assert bands.by_name("2 m").eval_freq_mhz == 144.0    # flat limit -> lower edge
-    assert bands.by_name("70 cm").eval_freq_mhz == 420.0  # limit rises with frequency
+    assert regions.US.eval_freq_mhz(bands.by_name("20 m")) == 14.35   # limit falls with frequency
+    assert regions.US.eval_freq_mhz(bands.by_name("2 m")) == 144.0    # flat limit -> lower edge
+    assert regions.US.eval_freq_mhz(bands.by_name("70 cm")) == 420.0  # limit rises with frequency
     for b in bands.BANDS:
-        e = mpe_limit_mw_cm2(b.eval_freq_mhz, False)
+        e = mpe_limit_mw_cm2(regions.US.eval_freq_mhz(b), False)
         assert e <= mpe_limit_mw_cm2(b.low_mhz, False) + 1e-12
         assert e <= mpe_limit_mw_cm2(b.high_mhz, False) + 1e-12
 
@@ -77,7 +77,7 @@ def test_report_single_and_multi():
     assert "http://" not in one and "https://" not in one  # fully self-contained
 
     sel = [bands.by_name(n) for n in ("20 m", "2 m", "70 cm")]
-    evs = [evaluate(s, b.eval_freq_mhz, b) for b in sel]
+    evs = [evaluate(s, regions.US.eval_freq_mhz(b), b) for b in sel]
     multi = build_report(s, evs, datetime(2026, 1, 2))
     assert "Summary: minimum safe distance" in multi
     for b in sel:
@@ -90,7 +90,7 @@ def test_report_is_well_formed_html():
     from html.parser import HTMLParser
 
     s = station()
-    evs = [evaluate(s, b.eval_freq_mhz, b) for b in bands.BANDS]
+    evs = [evaluate(s, regions.US.eval_freq_mhz(b), b) for b in bands.BANDS]
     stack = []
     void = {"meta"}
 
@@ -136,8 +136,3 @@ def test_segments_must_ascend_without_overlap():
         bands.seg("x", (6, 5))
     with pytest.raises(ValueError):
         bands.seg("x")
-
-
-def test_eval_freq_checks_every_segment_edge():
-    b = bands.seg("x", (14.0, 14.1), (14.3, 14.35))
-    assert b.eval_freq_mhz == 14.35

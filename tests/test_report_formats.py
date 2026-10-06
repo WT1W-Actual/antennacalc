@@ -6,7 +6,7 @@ from datetime import datetime
 
 import pytest
 
-from antennacalc import bands
+from antennacalc import bands, regions
 from antennacalc.evaluate import Station, evaluate
 from antennacalc.pdf import string_width
 from antennacalc.report import (
@@ -29,7 +29,7 @@ def station(**kw):
 
 
 def all_bands(s):
-    return [evaluate(s, b.eval_freq_mhz, b) for b in bands.BANDS]
+    return [evaluate(s, regions.US.eval_freq_mhz(b), b) for b in bands.BANDS]
 
 
 # --- choosing a format from the save dialog ---------------------------------
@@ -110,7 +110,7 @@ def test_text_report_single():
 def test_text_report_multi_has_summary_and_every_band():
     s = station()
     sel = [bands.by_name(n) for n in ("20 m", "2 m", "70 cm")]
-    out = build_text_report(s, [evaluate(s, b.eval_freq_mhz, b) for b in sel], WHEN)
+    out = build_text_report(s, [evaluate(s, regions.US.eval_freq_mhz(b), b) for b in sel], WHEN)
     assert "SUMMARY: MINIMUM SAFE DISTANCE" in out
     for b in sel:
         assert f"BAND: {b.label}" in out
@@ -253,7 +253,7 @@ def test_pdf_page_count_matches_tree():
 def test_pdf_contains_report_text():
     s = station()
     sel = [bands.by_name(n) for n in ("20 m", "2 m")]
-    data = render_report("pdf", s, [evaluate(s, b.eval_freq_mhz, b) for b in sel], WHEN)
+    data = render_report("pdf", s, [evaluate(s, regions.US.eval_freq_mhz(b), b) for b in sel], WHEN)
     text = "".join(page_texts(data))
     for needle in ("(Antenna RF Exposure Report)", "(Summary: minimum safe distance)",
                    "(Controlled environment)", "(Uncontrolled environment)",
