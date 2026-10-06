@@ -14,26 +14,29 @@ import textwrap
 from datetime import datetime
 from html import escape
 
+from typing import Optional
+
 from . import __version__
-from .evaluate import Evaluation, Station
+from .calc import Result
+from .evaluate import NOT_APPLICABLE, Environment, Evaluation, Station, environments
+from .limits import FCC, Limit
 
 TITLE = "Antenna RF Exposure Report"
 
-DISCLAIMER = (
-    "This report is an estimate for planning purposes only, based on the far-field "
-    "model in FCC OET Bulletin 65 and the limits in 47 CFR 1.1310. It is not valid "
-    "for antennas within 20 cm (8 in) of a person, does not model near-field effects, "
-    "and evaluates one transmitter at a time. The station licensee is responsible "
-    "for compliance."
-)
+def disclaimer(limit: Limit) -> str:
+    return (
+        "This report is an estimate for planning purposes only, based on the far-field "
+        f"model in FCC OET Bulletin 65 and the limits in {limit.name}. It is not valid "
+        "for antennas within 20 cm (8 in) of a person, does not model near-field effects, "
+        "and evaluates one transmitter at a time. The station licensee is responsible "
+        "for compliance."
+    )
+
+
+DISCLAIMER = disclaimer(FCC)
+PLANE_WAVE_NOTE = "Limit is the plane-wave equivalent of the {name}'s E and H field limits."
 
 TOO_CLOSE = "a distance is under 20 cm; results are not reliable that close."
-
-# (title, css class, averaging minutes, Evaluation attribute)
-ENVIRONMENTS = (
-    ("Controlled environment", "ctrl", 6, "controlled"),
-    ("Uncontrolled environment", "unctrl", 30, "uncontrolled"),
-)
 
 # Save formats: key -> (file dialog label, extension)
 FORMATS = {
@@ -68,6 +71,8 @@ def frequency_rows(station: Station, e: Evaluation) -> Rows:
     if e.band:
         rows.append(("Band range", f"{e.band.range_text} (evaluated at the most "
                                    "conservative frequency in the band)"))
+    if e.plane_wave:
+        rows.append(("Limit basis", PLANE_WAVE_NOTE.format(name=e.region.limit.name)))
     rows += [
         ("Transmitter power", f"{station.tx_power_w:.4g} W"),
         ("Feedline loss at this frequency", f"{e.loss_db:.2f} dB"),
@@ -100,7 +105,18 @@ def count_text(evaluations: list[Evaluation]) -> str:
     return f"{n} frequenc{'y' if n == 1 else 'ies'} evaluated"
 
 
-def distance_text(r) -> str:
+def region_rows(e: Evaluation) -> Rows:
+    return [("Region", e.region.name), ("Exposure limits", e.region.limit.citation)]
+
+
+def notes_for(evaluations: list[Evaluation]) -> list[str]:
+    lim = evaluations[0].region.limit
+    return [disclaimer(lim), *lim.notes]
+
+
+def distance_text(r: Optional[Result]) -> str:
+    if r is None:
+        return "n/a"
     return f"{r.safe_distance_ft:.2f} ft ({r.safe_distance_m:.2f} m)"
 
 
@@ -145,11 +161,16 @@ def _anchor(label: str) -> str:
     return "band-" + re.sub(r"[^a-z0-9]+", "-", label.lower()).strip("-")
 
 
-def _env(title: str, css: str, minutes: int, r) -> str:
+def _env(e: Evaluation, env: Environment) -> str:
+    if env.result is None:
+        na = NOT_APPLICABLE.format(region=e.region.name)
+        return (f'<div class="env {env.css}"><h3>{escape(env.title)}</h3>'
+                f'<p>{escape(na)}</p>'
+                f'{_kv([("Minimum safe distance", "n/a")], "kv key")}</div>')
     return (
-        f'<div class="env {css}"><h3>{escape(title)} '
-        f'<span class="note">({minutes} minute average)</span></h3>'
-        f"{_kv(environment_rows(r))}{_kv(distance_rows(r), 'kv key')}</div>"
+        f'<div class="env {env.css}"><h3>{escape(env.title)} '
+        f'<span class="note">({env.minutes:g} minute average)</span></h3>'
+        f"{_kv(environment_rows(env.result))}{_kv(distance_rows(env.result), 'kv key')}</div>"
     )
 
 
@@ -173,9 +194,10 @@ def build_report(
     )
 
     p.append("<h2>Station</h2>")
-    p.append(_kv(station_rows(station)))
+    p.append(_kv(station_rows(station) + region_rows(evaluations[0])))
 
     if len(evaluations) > 1:
+        envs = environments(evaluations[0])
         p.append("<h2>Summary: minimum safe distance</h2>")
         rows = "".join(
             f'<tr><td><a href="#{_anchor(e.label)}">{escape(e.label)}</a></td>'
@@ -186,7 +208,8 @@ def build_report(
         )
         p.append(
             '<table><tr><th>Band</th><th class="num">Evaluated at (MHz)</th>'
-            '<th class="num">Controlled</th><th class="num">Uncontrolled</th></tr>'
+            f'<th class="num">{escape(envs[0].short)}</th>'
+            f'<th class="num">{escape(envs[1].short)}</th></tr>'
             f"{rows}</table>"
         )
 
@@ -194,14 +217,15 @@ def build_report(
         p.append(f'<div class="band"><h2 id="{_anchor(e.label)}">'
                  f"{escape(section_title(e))}</h2>")
         p.append(_kv(frequency_rows(station, e)))
-        for title, css, minutes, attr in ENVIRONMENTS:
-            p.append(_env(title, css, minutes, getattr(e, attr)))
+        for env in environments(e):
+            p.append(_env(e, env))
         if e.too_close:
             p.append(f'<div class="warn"><strong>Warning:</strong> {TOO_CLOSE}</div>')
         p.append("</div>")
 
     p.append("<h2>Notes</h2>")
-    p.append(f'<p class="note">{escape(DISCLAIMER)}</p>')
+    for n in notes_for(evaluations):
+        p.append(f'<p class="note">{escape(n)}</p>')
     p.append("</body></html>\n")
     return "\n".join(p)
 
@@ -221,6 +245,10 @@ def _text_rows(rows: Rows, indent: int = 2) -> list[str]:
     return out
 
 
+def _ft(r: Optional[Result]) -> str:
+    return "n/a" if r is None else f"{r.safe_distance_ft:.2f} ft"
+
+
 def build_text_report(
     station: Station, evaluations: list[Evaluation], when: datetime | None = None
 ) -> str:
@@ -233,48 +261,56 @@ def build_text_report(
         ("Program", f"antennacalc {__version__}"),
         ("Frequencies evaluated", str(len(evaluations))),
     ], 0)
-    out += ["", "STATION", rule] + _text_rows(station_rows(station))
+    out += ["", "STATION", rule] + _text_rows(station_rows(station) + region_rows(evaluations[0]))
 
     if len(evaluations) > 1:
         out += ["", "SUMMARY: MINIMUM SAFE DISTANCE (feet)", rule]
-        out.append(f"  {'Band':<28}{'MHz':>10}{'Controlled':>15}{'Uncontrolled':>15}")
+        envs = environments(evaluations[0])
+        out.append(f"  {'Band':<28}{'MHz':>10}"
+                   f"{envs[0].short[:14]:>15}{envs[1].short[:14]:>15}")
         for e in evaluations:
             # Multi-segment labels overrun the column; the name alone fits.
             name = e.label if len(e.label) <= 28 or not e.band else e.band.name
             out.append(
                 f"  {name:<28}{e.freq_mhz:>10g}"
-                f"{e.controlled.safe_distance_ft:>12.2f} ft"
-                f"{e.uncontrolled.safe_distance_ft:>12.2f} ft"
+                f"{_ft(e.controlled):>15}{_ft(e.uncontrolled):>15}"
             )
 
     for e in evaluations:
         out += ["", bar, f"{'BAND' if e.band else 'FREQUENCY'}: {e.label}", bar]
         out += _text_rows(frequency_rows(station, e), 0)
-        for title, _css, minutes, attr in ENVIRONMENTS:
-            r = getattr(e, attr)
-            out += ["", f"{title.upper()} ({minutes} minute average)", rule]
-            out += _text_rows(environment_rows(r) + distance_rows(r))
+        for env in environments(e):
+            if env.result is None:
+                out += ["", env.title.upper(), rule]
+                out += textwrap.wrap(NOT_APPLICABLE.format(region=e.region.name), WIDTH,
+                                     initial_indent="  ", subsequent_indent="  ")
+                out += _text_rows([("Minimum safe distance", "n/a")])
+                continue
+            out += ["", f"{env.title.upper()} ({env.minutes:g} minute average)", rule]
+            out += _text_rows(environment_rows(env.result) + distance_rows(env.result))
         if e.too_close:
             out += [""] + textwrap.wrap(f"WARNING: {TOO_CLOSE}", WIDTH,
                                         initial_indent="  ", subsequent_indent="  ")
 
     out += ["", bar, "NOTES", bar]
-    out += textwrap.wrap(DISCLAIMER, WIDTH)
-    out.append("")
+    for n in notes_for(evaluations):
+        out += textwrap.wrap(n, WIDTH) + [""]
     return "\n".join(out)
 
 
 # --- CSV ---------------------------------------------------------------------
 
-def _csv_environment(title: str, minutes: int, r) -> dict[str, str]:
-    env = title.split()[0]  # "Controlled" / "Uncontrolled"
+def _csv_environment(prefix: str, e: Evaluation, env: Environment) -> dict[str, str]:
+    r = env.result
+    blank = r is None
     return {
-        f"{env} averaging period (min)": str(minutes),
-        f"{env} max allowed power density (mW/cm²)": f"{r.limit_mw_cm2:.4g}",
-        f"{env} time averaged power (W)": f"{r.avg_power_w:.4g}",
-        f"{env} EIRP (W)": f"{r.eirp_w:.4g}",
-        f"{env} minimum safe distance (ft)": f"{r.safe_distance_ft:.2f}",
-        f"{env} minimum safe distance (m)": f"{r.safe_distance_m:.2f}",
+        f"{prefix} averaging period (min)": "" if blank else f"{env.minutes:g}",
+        f"{prefix} max allowed power density (mW/cm²)": "" if blank else f"{r.limit_mw_cm2:.4g}",
+        f"{prefix} time averaged power (W)": "" if blank else f"{r.avg_power_w:.4g}",
+        f"{prefix} EIRP (W)": "" if blank else f"{r.eirp_w:.4g}",
+        f"{prefix} minimum safe distance (ft)": "" if blank else f"{r.safe_distance_ft:.2f}",
+        f"{prefix} minimum safe distance (m)": "" if blank else f"{r.safe_distance_m:.2f}",
+        f"{prefix} note": NOT_APPLICABLE.format(region=e.region.name) if blank else "",
     }
 
 
@@ -292,6 +328,8 @@ def build_csv_report(
         row = {
             "Generated": when.strftime("%Y-%m-%d %H:%M"),
             "Program": f"antennacalc {__version__}",
+            "Region": e.region.name,
+            "Exposure limits": e.region.limit.citation,
             "Band": e.band.name if e.band else "",
             "Band range": e.band.range_text if e.band else "",
             "Frequency evaluated (MHz)": f"{e.freq_mhz:g}",
@@ -307,8 +345,8 @@ def build_csv_report(
             "Feedline loss at this frequency (dB)": f"{e.loss_db:.2f}",
             "Power at antenna (W)": f"{e.power_at_antenna_w:.4g}",
         }
-        for title, _css, minutes, attr in ENVIRONMENTS:
-            row.update(_csv_environment(title, minutes, getattr(e, attr)))
+        for prefix, env in zip(("Controlled", "Uncontrolled"), environments(e)):
+            row.update(_csv_environment(prefix, e, env))
         row["Under 20 cm"] = "yes" if e.too_close else "no"
         rows.append(row)
 

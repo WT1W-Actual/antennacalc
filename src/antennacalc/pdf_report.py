@@ -7,11 +7,11 @@ from datetime import datetime
 from typing import Callable
 
 from . import __version__
-from .evaluate import Evaluation, Station
+from .evaluate import NOT_APPLICABLE, Evaluation, Station, environments
 from .pdf import PAGE_H, PAGE_W, Document, Page, string_width, wrap
 from .report import (
-    DISCLAIMER, ENVIRONMENTS, TITLE, TOO_CLOSE, Rows, count_text, distance_rows,
-    distance_text, environment_rows, frequency_rows, section_title, station_rows,
+    TITLE, TOO_CLOSE, Rows, count_text, distance_rows, distance_text, environment_rows,
+    frequency_rows, notes_for, region_rows, section_title, station_rows,
 )
 
 MARGIN = 54.0
@@ -123,18 +123,21 @@ def results(e: Evaluation) -> list[Block]:
     Same rows as the HTML report; minimum safe distances in bold.
     """
     label_w = round(BODY_W * 0.42, 2)
-    col_w = (BODY_W - label_w) / len(ENVIRONMENTS)
-    envs = [(title, minutes, ENV_COLORS[css], getattr(e, attr))
-            for title, css, minutes, attr in ENVIRONMENTS]
+    envs = environments(e)
+    col_w = (BODY_W - label_w) / len(envs)
     head = row([Cell("", label_w, fill=HEAD_BG)] + [
-        Cell(title, col_w, True, fill=fill, sub=f"({minutes} minute average)", bar=bar)
-        for title, minutes, (fill, bar), _r in envs])
+        Cell(env.title, col_w, True, fill=ENV_COLORS[env.css][0], bar=ENV_COLORS[env.css][1],
+             sub="" if env.result is None else f"({env.minutes:g} minute average)")
+        for env in envs])
     blocks = [spacer(8), head]
+    template = next(env.result for env in envs if env.result is not None)
     for rows_of, bold in ((environment_rows, False), (distance_rows, True)):
-        per_env = [rows_of(r) for *_rest, r in envs]
-        for i, (label, _v) in enumerate(per_env[0]):
+        for i, (label, _v) in enumerate(rows_of(template)):
             blocks.append(row([Cell(label, label_w, True, fill=HEAD_BG)] + [
-                Cell(rows[i][1], col_w, bold, right=True, fill=WHITE) for rows in per_env]))
+                Cell("n/a" if env.result is None else rows_of(env.result)[i][1],
+                     col_w, bold, right=True, fill=WHITE) for env in envs]))
+    if any(env.result is None for env in envs):
+        blocks.append(text_block(NOT_APPLICABLE.format(region=e.region.name), 9, color=MUTED))
     return blocks
 
 
@@ -159,10 +162,11 @@ def warning() -> list[Block]:
 def summary(evaluations: list[Evaluation]) -> list[list[Block]]:
     """Summary table as groups: the header travels with its first row."""
     widths = [BODY_W * 0.34, BODY_W * 0.18, BODY_W * 0.24, BODY_W * 0.24]
+    envs = environments(evaluations[0])
     head = row([Cell("Band", widths[0], True, fill=HEAD_BG),
                 Cell("Evaluated at (MHz)", widths[1], True, True, HEAD_BG),
-                Cell("Controlled", widths[2], True, True, HEAD_BG),
-                Cell("Uncontrolled", widths[3], True, True, HEAD_BG)])
+                Cell(envs[0].short, widths[2], True, True, HEAD_BG),
+                Cell(envs[1].short, widths[3], True, True, HEAD_BG)])
     rows = [row([Cell(e.label, widths[0]),
                  Cell(f"{e.freq_mhz:g}", widths[1], right=True),
                  Cell(distance_text(e.controlled), widths[2], right=True),
@@ -204,7 +208,7 @@ def build_pdf_report(
         text_block(f"Generated {when.strftime('%Y-%m-%d %H:%M')} by antennacalc "
                    f"{__version__} · {count_text(evaluations)}", 9.5, color=MUTED),
     ])
-    flow.place(heading("Station") + kv_rows(station_rows(station)))
+    flow.place(heading("Station") + kv_rows(station_rows(station) + region_rows(evaluations[0])))
 
     if len(evaluations) > 1:
         for group in summary(evaluations):
@@ -216,7 +220,8 @@ def build_pdf_report(
             section += warning()
         flow.place(section)
 
-    flow.place(heading("Notes") + [text_block(DISCLAIMER, 9, color=MUTED)])
+    flow.place(heading("Notes") + [text_block(n, 9, color=MUTED, after=4)
+                                   for n in notes_for(evaluations)])
 
     pages = flow.doc.pages
     for n, page in enumerate(pages, start=1):

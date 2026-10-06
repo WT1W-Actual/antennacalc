@@ -146,7 +146,7 @@ def test_csv_has_one_row_per_band_with_every_field():
     rows = read_csv(render_report("csv", s, evs, WHEN))
     assert len(rows) == len(evs)
     assert list(rows[0]) == [
-        "Generated", "Program", "Band", "Band range", "Frequency evaluated (MHz)",
+        "Generated", "Program", "Region", "Exposure limits", "Band", "Band range", "Frequency evaluated (MHz)",
         "Antenna type", "Antenna gain (dBi)", "Transmitter power (W)", "Feedline",
         "Mode", "Duty cycle (%)", "Transmit minutes", "Receive minutes",
         "Ground reflection", "Feedline loss at this frequency (dB)", "Power at antenna (W)",
@@ -154,10 +154,12 @@ def test_csv_has_one_row_per_band_with_every_field():
         "Controlled max allowed power density (mW/cm²)",
         "Controlled time averaged power (W)", "Controlled EIRP (W)",
         "Controlled minimum safe distance (ft)", "Controlled minimum safe distance (m)",
+        "Controlled note",
         "Uncontrolled averaging period (min)",
         "Uncontrolled max allowed power density (mW/cm²)",
         "Uncontrolled time averaged power (W)", "Uncontrolled EIRP (W)",
         "Uncontrolled minimum safe distance (ft)", "Uncontrolled minimum safe distance (m)",
+        "Uncontrolled note",
         "Under 20 cm",
     ]
     for row, e in zip(rows, evs):
@@ -303,3 +305,58 @@ def test_string_width_uses_helvetica_metrics():
     assert string_width("Hello", 10, bold=True) == pytest.approx(
         (722 + 556 + 278 + 278 + 611) / 100)
     assert string_width("", 12) == 0
+
+
+from antennacalc import regions
+
+
+def de_evals(s):
+    sel = [regions.GERMANY.find(n) for n in ("160 m", "2 m")]
+    return [evaluate(s, regions.GERMANY.eval_freq_mhz(b), b, regions.GERMANY) for b in sel]
+
+
+def test_every_format_names_region_and_citation():
+    s = station()
+    evs = de_evals(s)
+    html = build_report(s, evs, WHEN)
+    txt = build_text_report(s, evs, WHEN)
+    for out in (html, txt):
+        assert "Germany" in out and "26. BImSchV" in out
+        assert "plane-wave equivalent" in out
+        assert "50527" in out
+    rows = read_csv(render_report("csv", s, evs, WHEN))
+    assert rows[0]["Region"] == "Germany"
+    assert "26. BImSchV" in rows[0]["Exposure limits"]
+
+
+def test_missing_tier_prints_na():
+    s = station()
+    evs = de_evals(s)
+    html = build_report(s, evs, WHEN)
+    assert "Not applicable: Germany sets no controlled tier" in html
+    assert ">n/a<" in html
+    txt = build_text_report(s, evs, WHEN)
+    assert "n/a" in txt
+    for line in txt.splitlines():
+        assert len(line) <= 72, line
+    row = read_csv(render_report("csv", s, evs, WHEN))[0]
+    assert row["Controlled minimum safe distance (ft)"] == ""
+    assert row["Controlled note"].startswith("Not applicable")
+    pdf = render_report("pdf", s, evs, WHEN)
+    assert pdf.startswith(b"%PDF")
+
+
+def test_region_tier_labels_and_minutes_in_reports():
+    s = station()
+    e = evaluate(s, 146.0, None, regions.AUSTRALIA)
+    html = build_report(s, [e], WHEN)
+    assert "General public" in html and "(30 minute average)" in html
+    txt = build_text_report(s, [e], WHEN)
+    assert "GENERAL PUBLIC (30 minute average)" in txt
+
+
+def test_us_report_has_region_rows_and_no_plane_wave_note():
+    s = station()
+    html = build_report(s, [evaluate(s, 7.1)], WHEN)
+    assert "United States" in html and "47 CFR 1.1310" in html
+    assert "plane-wave equivalent" not in html
