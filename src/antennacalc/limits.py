@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
@@ -94,4 +95,67 @@ FCC = Limit(
                   lambda f: mpe_limit_mw_cm2(f, True), lambda f: 6.0),
     breakpoints=(1.34, 3.0, 30.0, 300.0, 1500.0),
     plane_wave_below_mhz=0.0,
+)
+
+
+def _in(f: float, lo: float, hi: float, name: str) -> None:
+    if not lo <= f <= hi:
+        raise ValueError(f"Frequency must be between {lo:g} and {hi:g} MHz under {name}")
+
+
+def sc6_uncontrolled_w_m2(f: float) -> float:
+    """Safety Code 6 (2015), uncontrolled environment. Tables 3 and 5."""
+    _in(f, 0.1, 300_000.0, "Safety Code 6")
+    if f < 10:
+        return plane_wave_w_m2(min(83.0, 87.0 / math.sqrt(f)), min(90.0, 0.73 / f))
+    if f < 20:
+        return 2.0
+    if f < 48:
+        return 8.944 / math.sqrt(f)
+    if f < 300:
+        return 1.291
+    if f < 6000:
+        return 0.02619 * f ** 0.6834
+    if f < 150_000:
+        return 10.0
+    return 6.67e-5 * f
+
+
+def sc6_controlled_w_m2(f: float) -> float:
+    """Safety Code 6 (2015), controlled environment. Tables 4 and 6."""
+    _in(f, 0.1, 300_000.0, "Safety Code 6")
+    if f < 10:
+        return plane_wave_w_m2(min(170.0, 193.0 / math.sqrt(f)), min(180.0, 1.6 / f))
+    if f < 20:
+        return 10.0
+    if f < 48:
+        return 44.72 / math.sqrt(f)
+    if f < 100:
+        return 6.455
+    if f < 6000:
+        return 0.6455 * math.sqrt(f)
+    if f < 150_000:
+        return 50.0
+    return 3.33e-4 * f
+
+
+def sc6_avg_minutes(f: float) -> float:
+    return 6.0 if f < 15_000 else 616_000.0 / f ** 1.2
+
+
+SC6 = Limit(
+    name="Health Canada Safety Code 6",
+    citation=("Health Canada Safety Code 6 (2015), Tables 3 to 6; applied to amateur "
+              "stations by ISED RBR-4 Issue 3 s.12 and CPC-2-0-03 Issue 6 s.7.1"),
+    min_mhz=0.1,
+    max_mhz=300_000.0,
+    public=Tier("Uncontrolled environment", "Uncontrolled",
+                lambda f: sc6_uncontrolled_w_m2(f) / 10, sc6_avg_minutes),
+    operator=Tier("Controlled environment", "Controlled",
+                  lambda f: sc6_controlled_w_m2(f) / 10, sc6_avg_minutes),
+    breakpoints=(10.0, 20.0, 48.0, 100.0, 300.0, 6000.0, 15_000.0, 150_000.0),
+    plane_wave_below_mhz=10.0,
+    notes=("Below 10 MHz, Safety Code 6's instantaneous nerve-stimulation limits "
+           "(83 V/m uncontrolled, 170 V/m controlled) are applied as averaged limits, "
+           "which is conservative.",),
 )
