@@ -182,3 +182,9 @@ def test_plane_wave_flag():
     assert evaluate(station(), 7.1, None, regions.CANADA).plane_wave
     assert not evaluate(station(), 14.2, None, regions.CANADA).plane_wave
     assert not evaluate(station(), 7.1).plane_wave
+
+
+def test_help_text_is_region_neutral():
+    from antennacalc.helptext import HELP_TEXT
+    assert "REGION" in HELP_TEXT
+    assert "within FCC limits" not in HELP_TEXT

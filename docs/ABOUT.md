@@ -1,8 +1,10 @@
 # About antennacalc
 
 antennacalc estimates the minimum distance you should keep from an amateur radio
-antenna to stay within the FCC's maximum permissible exposure (MPE) limits for RF
-energy. It mirrors the [ARRL RF Exposure Calculator](https://www.arrl.org/rf-exposure-calculator)
+antenna to stay within the maximum permissible exposure (MPE) limits for RF energy in
+your region: United States (FCC), Canada, Australia, Germany, France, Italy or Europe
+(CEPT). [SOURCES.md](SOURCES.md) lists the document behind each region. For the United
+States it mirrors the [ARRL RF Exposure Calculator](https://www.arrl.org/rf-exposure-calculator)
 and its results were checked against that calculator.
 
 > **Estimate only.** Not valid for antennas within 20 cm (8 in) of a person. It uses
@@ -29,9 +31,9 @@ Fill in the form and press **Calculate**. Results appear for both exposure envir
 
 The **Frequency** box offers two mutually exclusive ways to choose what to evaluate:
 
-- **Bands:** tick any of the US amateur bands (630 m through 4 mm), or use **Select all** /
+- **Bands:** tick any of the selected region's amateur bands, or use **Select all** /
   **Clear**. Each band is evaluated at its *most conservative* frequency: the band edge
-  with the lowest FCC limit (the lower edge when the limit is flat across the band).
+  with the lowest limit (the lower edge when the limit is flat across the band).
 - **Specific frequency:** type a frequency in MHz (0.3 MHz to 100 GHz). Typing a frequency
   clears all band selections, and ticking a band clears the frequency.
 
@@ -129,7 +131,7 @@ nothing is embedded; characters outside the Windows Latin-1 set print as `?`.
 ## How it calculates
 
 1. Pick the frequency: the one you typed, or each selected band's most conservative frequency.
-2. Look up the FCC limit for that frequency and environment (47 CFR 1.1310).
+2. Look up the limit for that frequency and environment in the region's table (47 CFR 1.1310 in the US).
 3. Reduce transmitter power by the feedline loss at that frequency.
 4. Time-average the power over the 6 or 30 minute period using your duty cycle and
    transmit/receive pattern. The transmit/receive cycle is repeated across the period,
@@ -164,3 +166,4 @@ nothing is embedded; characters outside the Windows Latin-1 set print as `?`.
 - [ARRL RF Exposure Calculator](https://www.arrl.org/rf-exposure-calculator) and its [instructions](https://www.arrl.org/rf-exposure-calc-instructions)
 - [ARRL: The Station Evaluation](https://www.arrl.org/fcc-rf-exposure-regulations-the-station-evaluation)
 - FCC 47 CFR 1.1310 and OET Bulletin 65
+- [SOURCES.md](SOURCES.md) for the Canadian, Australian and European documents
