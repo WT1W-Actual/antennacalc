@@ -351,6 +351,8 @@ def build_csv_report(
         for prefix, env in zip(("Controlled", "Uncontrolled"), environments(e)):
             row.update(_csv_environment(prefix, e, env))
         row["Under 20 cm"] = "yes" if e.too_close else "no"
+        basis = [PLANE_WAVE_NOTE.format(name=e.region.limit.name)] if e.plane_wave else []
+        row["Notes"] = " ".join(basis + list(e.region.limit.notes))
         rows.append(row)
 
     out = io.StringIO()

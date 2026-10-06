@@ -176,7 +176,7 @@ def test_csv_has_one_row_per_band_with_every_field():
         "Uncontrolled time averaged power (W)", "Uncontrolled EIRP (W)",
         "Uncontrolled minimum safe distance (ft)", "Uncontrolled minimum safe distance (m)",
         "Uncontrolled note",
-        "Under 20 cm",
+        "Under 20 cm", "Notes",
     ]
     for row, e in zip(rows, evs):
         assert row["Band"] == e.band.name
@@ -363,6 +363,8 @@ def test_every_format_names_region_and_citation():
     rows = read_csv(render_report("csv", s, evs, WHEN))
     assert rows[0]["Region"] == "Germany"
     assert "26. BImSchV" in rows[0]["Exposure limits"]
+    assert "plane-wave equivalent" in rows[0]["Notes"]
+    assert "implant" in rows[0]["Notes"].lower()
 
 
 def test_missing_tier_prints_na():
@@ -396,3 +398,21 @@ def test_us_report_has_region_rows_and_no_plane_wave_note():
     html = build_report(s, [evaluate(s, 7.1)], WHEN)
     assert "United States" in html and "47 CFR 1.1310" in html
     assert "plane-wave equivalent" not in html
+
+
+def test_csv_notes_column_is_last_and_prefixes_are_stable():
+    s = station()
+    header = list(read_csv(render_report("csv", s, de_evals(s), WHEN))[0])
+    assert header[-1] == "Notes"
+    assert "Controlled minimum safe distance (ft)" in header
+    assert "Uncontrolled minimum safe distance (ft)" in header
+
+
+def test_csv_notes_follow_the_row_and_the_region():
+    s = station()
+    it = regions.ITALY
+    b = it.find("2 m")
+    rows = read_csv(render_report("csv", s, [evaluate(s, it.eval_freq_mhz(b), b, it)], WHEN))
+    assert "24-hour" in rows[0]["Notes"]
+    us = read_csv(render_report("csv", s, [evaluate(s, 146.0)], WHEN))[0]
+    assert "plane-wave" not in us["Notes"]
