@@ -12,7 +12,7 @@ HINTS = {
         "conservative frequency (the edge with the lowest allowed power density)."
     ),
     "freq": (
-        "Evaluate one specific frequency in MHz (0.3 to 100000). Typing here "
+        "Evaluate one specific frequency in MHz, within the selected region's limit range. Typing here "
         "clears the band selection, and ticking a band clears this."
     ),
     "antenna": (

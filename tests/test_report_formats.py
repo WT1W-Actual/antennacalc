@@ -343,9 +343,6 @@ def test_string_width_uses_helvetica_metrics():
     assert string_width("", 12) == 0
 
 
-from antennacalc import regions
-
-
 def de_evals(s):
     sel = [regions.GERMANY.find(n) for n in ("160 m", "2 m")]
     return [evaluate(s, regions.GERMANY.eval_freq_mhz(b), b, regions.GERMANY) for b in sel]
@@ -382,6 +379,22 @@ def test_missing_tier_prints_na():
     assert row["Controlled note"].startswith("Not applicable")
     pdf = render_report("pdf", s, evs, WHEN)
     assert pdf.startswith(b"%PDF")
+    text = "".join(page_texts(pdf))
+    assert "Germany" in text
+    assert regions.GERMANY.limit.citation.split()[0] in text
+    assert "n/a" in text
+    assert "Not applicable: Germany sets no controlled tier" in text
+    assert "plane-wave equivalent" in "".join(
+        page_texts(render_report("pdf", s, [evaluate(s, 14.2, None, regions.AUSTRALIA)], WHEN)))
+
+
+def test_averaging_minutes_use_three_significant_figures():
+    s = station()
+    ev = evaluate(s, 76000.0, None, regions.CANADA)
+    assert "0.856 minute average" in build_report(s, [ev], WHEN)
+    assert "0.856 minute average" in build_text_report(s, [ev], WHEN)
+    assert "0.856 minute average" in "".join(page_texts(render_report("pdf", s, [ev], WHEN)))
+    assert "0.856258" not in build_report(s, [ev], WHEN)
 
 
 def test_region_tier_labels_and_minutes_in_reports():

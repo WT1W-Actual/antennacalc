@@ -81,3 +81,21 @@ def test_region_tooltip_names_limit(app):
     app.region_var.set("Australia")
     app._region_changed()
     assert "ARPANSA" in app.region_tip.text
+
+
+def test_no_tier_region_panel_explains_before_calculate(app):
+    app.region_var.set("Germany")
+    app._region_changed()
+    assert app.evaluations == []
+    assert app.na_text.get() == "Not applicable: Germany sets no controlled tier for amateur stations."
+    assert app.panel_na[True].winfo_manager() == "grid"
+    assert app.panel_na[False].winfo_manager() == ""
+    app.region_var.set("United States")
+    app._region_changed()
+    assert app.na_text.get() == ""
+    assert app.panel_na[True].winfo_manager() == ""
+
+
+def test_freq_tooltip_is_region_neutral():
+    from antennacalc.helptext import HINTS
+    assert "100000" not in HINTS["freq"]

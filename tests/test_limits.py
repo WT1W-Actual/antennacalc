@@ -176,3 +176,14 @@ def test_italy_6_v_per_m():
         assert limits.ITALY.public.limit_mw_cm2(f) == pytest.approx(0.010)
     assert limits.ITALY.public.avg_minutes(146) == 1440
     assert any("6 minutes" in n for n in limits.ITALY.notes)
+
+
+def test_arpansa_plane_wave_boundary_agrees_with_evaluation():
+    from antennacalc import regions
+    from antennacalc.evaluate import Station, evaluate
+    s = Station(tx_power_w=100, gain_dbi=2.15, mode="Conversational CW", duty_cycle=0.4,
+                tx_minutes=6, rx_minutes=4, ground=True, antenna="Dipole")
+    e = evaluate(s, 30.0, None, regions.AUSTRALIA)
+    assert e.plane_wave is False
+    assert limits.arpansa_public_w_m2(30.0) == 2.0
+    assert limits.arpansa_public_w_m2(29.999) != 2.0

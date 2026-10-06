@@ -131,7 +131,7 @@ def results(e: Evaluation) -> list[Block]:
     col_w = (BODY_W - label_w) / len(envs)
     head = row([Cell("", label_w, fill=HEAD_BG)] + [
         Cell(env.title, col_w, True, fill=ENV_COLORS[env.css][0], bar=ENV_COLORS[env.css][1],
-             sub="" if env.result is None else f"({env.minutes:g} minute average)")
+             sub="" if env.result is None else f"({env.minutes:.3g} minute average)")
         for env in envs])
     blocks = [spacer(8), head]
     template = next(env.result for env in envs if env.result is not None)

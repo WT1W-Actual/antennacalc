@@ -3,7 +3,7 @@ from datetime import datetime
 import pytest
 
 from antennacalc import bands, calc, regions
-from antennacalc.evaluate import Station, evaluate
+from antennacalc.evaluate import Station, environments, evaluate
 from antennacalc.feedline import CUSTOM, FeedlineConfig
 from antennacalc.limits import MAX_FREQ_MHZ, MIN_FREQ_MHZ, mpe_limit_mw_cm2
 from antennacalc.report import build_report
@@ -136,9 +136,6 @@ def test_segments_must_ascend_without_overlap():
         bands.seg("x", (6, 5))
     with pytest.raises(ValueError):
         bands.seg("x")
-
-
-from antennacalc.evaluate import environments  # noqa: E402
 
 
 def test_evaluate_defaults_to_us():

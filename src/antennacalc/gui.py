@@ -298,12 +298,12 @@ class App(ttk.Frame):
         ttk.Label(parent, textvariable=self.note, foreground="gray30",
                   wraplength=400, justify="left").grid(row=1, column=0, sticky="w", pady=(4, 0))
         self.panel_boxes: dict[bool, ttk.LabelFrame] = {}
+        self.panel_rows: dict[bool, list[tk.Widget]] = {}
+        self.panel_na: dict[bool, ttk.Label] = {}
         self.panels = {
             True: self._result_panel(parent, 2, "Controlled environment", True),
             False: self._result_panel(parent, 3, "Uncontrolled environment", False),
         }
-        ttk.Label(parent, textvariable=self.na_text, foreground="gray30",
-                  wraplength=400, justify="left").grid(row=4, column=0, sticky="w")
         ttk.Label(parent, textvariable=self.result, foreground="firebrick",
                   wraplength=400).grid(row=5, column=0, sticky="w")
         self.save_btn = ttk.Button(parent, text="Save report…", command=self.save_report)
@@ -317,21 +317,35 @@ class App(ttk.Frame):
     def _result_panel(self, parent: tk.Misc, grid_row: int, title: str,
                       key: bool) -> dict[str, tk.StringVar]:
         box = ttk.LabelFrame(parent, text=title, padding=8)
-        self.panel_boxes[key] = box
+        ctrl = key
+        self.panel_boxes[ctrl] = box
         box.grid(row=grid_row, column=0, sticky="ew", pady=4)
         box.columnconfigure(1, weight=1)
         vars_: dict[str, tk.StringVar] = {}
+        rows: list[tk.Widget] = []
         for i, (key, label) in enumerate(RESULT_FIELDS):
             vars_[key] = tk.StringVar(value="—")
             name = ttk.Label(box, text=label + ":")
             name.grid(row=i, column=0, sticky="w")
-            ttk.Label(box, textvariable=vars_[key], font=BOLD).grid(
-                row=i, column=1, sticky="e")
+            val = ttk.Label(box, textvariable=vars_[key], font=BOLD)
+            val.grid(row=i, column=1, sticky="e")
+            rows += [name, val]
             hint = {"avg": "avg", "eirp": "eirp", "ft": "dist", "m": "dist",
                     "loss": "loss"}.get(key)
             if hint:
                 Tooltip(name, HINTS[hint])
+        self.panel_rows[ctrl] = rows
+        na = ttk.Label(box, textvariable=self.na_text, foreground="gray30",
+                       wraplength=400, justify="left")
+        na.grid(row=0, column=0, columnspan=2, sticky="w")
+        na.grid_remove()
+        self.panel_na[ctrl] = na
         return vars_
+
+    def _show_na_panel(self, ctrl: bool, on: bool) -> None:
+        for w in self.panel_rows[ctrl]:
+            (w.grid_remove if on else w.grid)()
+        (self.panel_na[ctrl].grid if on else self.panel_na[ctrl].grid_remove)()
 
     # --- frequency selection -------------------------------------------------
 
@@ -471,7 +485,9 @@ class App(ttk.Frame):
         self.shown.set("")
         self.note.set("")
         self.result.set("")
-        self.na_text.set("")
+        r = self.region
+        self.na_text.set(NOT_APPLICABLE.format(region=r.name)
+                         if r.limit.tier(True) is None else "")
         self._clear_panels()
         self.save_btn.state(["disabled"])
 
@@ -501,11 +517,12 @@ class App(ttk.Frame):
         lim = self.region.limit
         for ctrl in (True, False):
             tier = lim.tier(ctrl)
+            self._show_na_panel(ctrl, tier is None)
             if tier is None:
                 text = "Controlled environment"
             else:
                 f = e.freq_mhz if e else lim.min_mhz
-                text = f"{tier.label} ({tier.avg_minutes(f):g} min average)"
+                text = f"{tier.label} ({tier.avg_minutes(f):.3g} min average)"
             self.panel_boxes[ctrl].configure(text=text)
 
     def _clear_panels(self) -> None:
@@ -518,13 +535,11 @@ class App(ttk.Frame):
         if e is None or self.station is None:
             return
         self._title_panels(e)
-        self.na_text.set("")
         for ctrl, r in ((True, e.controlled), (False, e.uncontrolled)):
             p = self.panels[ctrl]
             if r is None:
                 for v in p.values():
                     v.set("n/a")
-                self.na_text.set(NOT_APPLICABLE.format(region=e.region.name))
                 continue
             p["tx"].set(f"{self.station.tx_power_w:.4g} W")
             p["loss"].set(f"{e.loss_db:.2f} dB")

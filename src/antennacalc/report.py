@@ -169,7 +169,7 @@ def _env(e: Evaluation, env: Environment) -> str:
                 f'{_kv([("Minimum safe distance", "n/a")], "kv key")}</div>')
     return (
         f'<div class="env {env.css}"><h3>{escape(env.title)} '
-        f'<span class="note">({env.minutes:g} minute average)</span></h3>'
+        f'<span class="note">({env.minutes:.3g} minute average)</span></h3>'
         f"{_kv(environment_rows(env.result))}{_kv(distance_rows(env.result), 'kv key')}</div>"
     )
 
@@ -289,7 +289,7 @@ def build_text_report(
                                      initial_indent="  ", subsequent_indent="  ")
                 out += _text_rows([("Minimum safe distance", "n/a")])
                 continue
-            out += ["", f"{env.title.upper()} ({env.minutes:g} minute average)", rule]
+            out += ["", f"{env.title.upper()} ({env.minutes:.3g} minute average)", rule]
             out += _text_rows(environment_rows(env.result) + distance_rows(env.result))
         if e.too_close:
             out += [""] + textwrap.wrap(f"WARNING: {TOO_CLOSE}", WIDTH,

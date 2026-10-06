@@ -165,7 +165,7 @@ def arpansa_public_w_m2(f: float) -> float:
     """ARPANSA RPS S-1 (2021) Table 4, general public whole body; E below 6.27 MHz
     from Table 7 (83 V/m)."""
     _in(f, 0.1, 300_000.0, "ARPANSA RPS S-1")
-    if f <= 30:
+    if f < 30:
         e = 83.0 if f <= 6.27 else 300.0 / f ** 0.7
         return plane_wave_w_m2(e, 2.2 / f)
     if f <= 400:
