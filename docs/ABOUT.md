@@ -25,7 +25,7 @@ Fill in the form and press **Calculate**. Results appear for both exposure envir
 | Transmit time | Minutes transmitting, then minutes receiving, repeating. |
 | Antenna gain (dBi) | Gain relative to an isotropic radiator. Dipole is 2.15 dBi. Choosing an antenna type fills in a typical gain, which you can overwrite. The multiband vertical preset (about 10 m / 33 ft, DX Commander style) uses 3 dBi as a typical figure. Yagi presets (HF 2-6 elements, 6.5-12 dBi; VHF/UHF 3-15+ elements, 7.5-17 dBi) are typical free-space figures and vary by design; use the manufacturer's number when you have it. |
 | Ground reflection | Include signals reflecting off the ground. More conservative; use for low or non-directional antennas. |
-| Frequency | One or more US amateur bands, **or** a specific frequency (see below). |
+| Frequency | One or more amateur bands of the selected region, **or** a specific frequency (see below). |
 
 ### Choosing frequencies
 
@@ -34,11 +34,14 @@ The **Frequency** box offers two mutually exclusive ways to choose what to evalu
 - **Bands:** tick any of the selected region's amateur bands, or use **Select all** /
   **Clear**. Each band is evaluated at its *most conservative* frequency: the band edge
   with the lowest limit (the lower edge when the limit is flat across the band).
-- **Specific frequency:** type a frequency in MHz (0.3 MHz to 100 GHz). Typing a frequency
+- **Specific frequency:** type a frequency in MHz (0.3 MHz to 100 GHz in the United States, 0.1 MHz to 300 GHz in every other region). Typing a frequency
   clears all band selections, and ticking a band clears the frequency.
 
 With several bands selected, use the **Results for** list on the right to switch between
 them. The results always show the frequency that was evaluated.
+
+The table lists the United States bands. Each other region has its own band table, which
+the app shows when you choose that region.
 
 | Band | Range (MHz) | Band | Range (MHz) |
 |------|-------------|------|-------------|
@@ -47,17 +50,17 @@ them. The results always show the frequency that was evaluated.
 | 80 m | 3.5-4.0 | 70 cm | 420-450 |
 | 60 m | 5.3305-5.4035 | 33 cm | 902-928 |
 | 40 m | 7.0-7.3 | 23 cm | 1240-1300 |
-| 30 m | 10.1-10.15 | 13 cm | 2300-2450 |
-| 20 m | 14.0-14.35 | 9 cm | 3300-3500 |
-| 17 m | 18.068-18.168 | 5 cm | 5650-5925 |
-| 15 m | 21.0-21.45 | 3 cm | 10000-10500 |
-| 12 m | 24.89-24.99 | 1.2 cm | 24000-24250 |
-| 10 m | 28.0-29.7 | 6 mm | 47000-47200 |
-| 6 m | 50-54 | 4 mm | 76000-81000 |
+| 30 m | 10.1-10.15 | 13 cm | 2300-2310 and 2390-2450 |
+| 20 m | 14.0-14.35 | 5 cm | 5650-5925 |
+| 17 m | 18.068-18.168 | 3 cm | 10000-10500 |
+| 15 m | 21.0-21.45 | 1.2 cm | 24000-24250 |
+| 12 m | 24.89-24.99 | 6 mm | 47000-47200 |
+| 10 m | 28.0-29.7 | 4 mm | 76000-81000 |
+| 6 m | 50-54 | | |
 
 Each band range is the full allocation; individual modes and license classes may have
-narrower segments. The 2200 m band is not included because it lies below the 300 kHz
-lower limit of the FCC exposure table.
+narrower segments. In the United States the 2200 m band is not included because it lies
+below the 300 kHz lower limit of the FCC exposure table.
 
 ### Feedline loss estimator
 
@@ -79,15 +82,22 @@ Each environment gets its own panel:
 | Transmitter power | What you entered. |
 | Feedline loss | Loss at the frequency being shown. |
 | Power at antenna | Transmitter power reduced by feedline loss. |
-| Max allowed power density | FCC limit in mW/cm² at that frequency. |
+| Max allowed power density | The region's limit in mW/cm² at that frequency. |
 | Time averaged power | Power at antenna × mode duty cycle × fraction of time transmitting. |
 | EIRP | Time averaged power × antenna gain. |
 | Minimum safe distance | Distance (feet and meters) at which exposure equals the limit. |
 
-**Controlled** applies to people who know about the RF exposure and its effects (for
-example, you and your household once instructed in RF safety); the averaging period is
-6 minutes. **Uncontrolled** applies to everyone else, such as neighbors and the public;
-the averaging period is 30 minutes.
+In the United States and Canada, **Controlled** applies to people who know about the RF
+exposure and its effects (for example, you and your household once instructed in RF
+safety), and **Uncontrolled** applies to everyone else, such as neighbors and the public.
+The other regions set one general-public limit and no controlled tier, so their controlled
+panel reads n/a.
+
+The averaging period depends on the region. The United States uses 6 minutes (controlled)
+and 30 minutes (uncontrolled). Canada uses 6 minutes up to 15 GHz and a shorter period
+above that. Australia uses 30 minutes. Germany uses 6 minutes. France and Europe (CEPT)
+use 6 minutes up to 10 GHz and a shorter period above that. Italy uses 24 hours
+(1440 minutes). Each report states the period it used.
 
 ### Hints and help
 
@@ -133,7 +143,7 @@ nothing is embedded; characters outside the Windows Latin-1 set print as `?`.
 1. Pick the frequency: the one you typed, or each selected band's most conservative frequency.
 2. Look up the limit for that frequency and environment in the region's table (47 CFR 1.1310 in the US).
 3. Reduce transmitter power by the feedline loss at that frequency.
-4. Time-average the power over the 6 or 30 minute period using your duty cycle and
+4. Time-average the power over the region's averaging period (see Results) using your duty cycle and
    transmit/receive pattern. The transmit/receive cycle is repeated across the period,
    counting a partial final cycle, exactly as the ARRL calculator does.
 5. EIRP = averaged power × 10^(gain/10).
@@ -144,9 +154,10 @@ nothing is embedded; characters outside the Windows Latin-1 set print as `?`.
 
 | Path | Purpose |
 |------|---------|
-| `src/antennacalc/limits.py` | FCC MPE limit table. |
+| `src/antennacalc/limits.py` | Exposure limits for every supported region, starting with the FCC MPE table. |
 | `src/antennacalc/calc.py` | Exposure math and mode duty cycles (no GUI). |
-| `src/antennacalc/bands.py` | US amateur band list and each band's evaluation frequency. |
+| `src/antennacalc/bands.py` | Amateur band lists for every supported region. |
+| `src/antennacalc/regions.py` | Binds each region's band list to its limits and picks each band's most conservative evaluation frequency. |
 | `src/antennacalc/evaluate.py` | Evaluates a station at a frequency (loss, power, both environments). |
 | `src/antennacalc/report.py` | Report content shared by every format; builds the HTML, text and CSV reports and picks the format to save. |
 | `src/antennacalc/pdf_report.py` | Lays the report out as PDF pages. |
