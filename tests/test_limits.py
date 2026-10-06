@@ -97,3 +97,24 @@ def test_sc6_range_and_tiers():
         limits.sc6_uncontrolled_w_m2(0.05)
     with pytest.raises(ValueError):
         limits.sc6_uncontrolled_w_m2(300001)
+
+
+ARPANSA = [
+    (146.0, 2.0),
+    (446.0, 446.0 / 200),
+    (3000.0, 10.0),
+    (14.2, min((300 / 14.2 ** 0.7) ** 2 / 377, 377 * (2.2 / 14.2) ** 2)),
+    (3.6, min(83 ** 2 / 377, 377 * (2.2 / 3.6) ** 2)),
+]
+
+
+@pytest.mark.parametrize("f,s", ARPANSA)
+def test_arpansa_rows(f, s):
+    assert limits.arpansa_public_w_m2(f) == pytest.approx(s, rel=1e-6)
+
+
+def test_arpansa_has_no_operator_tier_and_30_min_average():
+    assert limits.ARPANSA.operator is None
+    assert limits.ARPANSA.public.avg_minutes(146) == 30
+    assert limits.ARPANSA.plane_wave_below_mhz == 30.0
+    assert limits.ARPANSA.public.label == "General public"

@@ -159,3 +159,32 @@ SC6 = Limit(
            "(83 V/m uncontrolled, 170 V/m controlled) are applied as averaged limits, "
            "which is conservative.",),
 )
+
+
+def arpansa_public_w_m2(f: float) -> float:
+    """ARPANSA RPS S-1 (2021) Table 4, general public whole body; E below 6.27 MHz
+    from Table 7 (83 V/m)."""
+    _in(f, 0.1, 300_000.0, "ARPANSA RPS S-1")
+    if f <= 30:
+        e = 83.0 if f <= 6.27 else 300.0 / f ** 0.7
+        return plane_wave_w_m2(e, 2.2 / f)
+    if f <= 400:
+        return 2.0
+    if f <= 2000:
+        return f / 200.0
+    return 10.0
+
+
+ARPANSA = Limit(
+    name="ARPANSA RPS S-1",
+    citation=("ARPANSA RPS S-1 (2021), Table 4, general public; applied to amateur "
+              "stations by the Radiocommunications (Amateur Stations) Class Licence 2023, "
+              "Schedule 1 clause 2"),
+    min_mhz=0.1,
+    max_mhz=300_000.0,
+    public=Tier("General public", "General public",
+                lambda f: arpansa_public_w_m2(f) / 10, lambda f: 30.0),
+    operator=None,
+    breakpoints=(6.27, 30.0, 400.0, 2000.0),
+    plane_wave_below_mhz=30.0,
+)
