@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from .limits import mpe_limit_mw_cm2
+from .limits import FCC, Tier, mpe_limit_mw_cm2
 
 # Ground reflection: field factor 1.6 -> power factor 1.6^2.
 GROUND_REFLECTION_FACTOR = 2.56
@@ -90,9 +90,12 @@ def calculate(
     rx_minutes: float,
     controlled: bool,
     ground: bool,
+    tier: "Tier | None" = None,
 ) -> Result:
-    limit = mpe_limit_mw_cm2(freq_mhz, controlled)
-    interval = CONTROLLED_AVG_MIN if controlled else UNCONTROLLED_AVG_MIN
+    if tier is None:
+        tier = FCC.operator if controlled else FCC.public
+    limit = tier.limit_mw_cm2(freq_mhz)
+    interval = tier.avg_minutes(freq_mhz)
     avg = average_power_w(power_w, duty_cycle, tx_fraction(tx_minutes, rx_minutes, interval))
     eirp = eirp_w(avg, gain_dbi)
     factor = GROUND_REFLECTION_FACTOR if ground else 1.0
