@@ -136,3 +136,49 @@ def test_segments_must_ascend_without_overlap():
         bands.seg("x", (6, 5))
     with pytest.raises(ValueError):
         bands.seg("x")
+
+
+from antennacalc.evaluate import environments  # noqa: E402
+
+
+def test_evaluate_defaults_to_us():
+    e = evaluate(station(), 14.2)
+    assert e.region is regions.US
+    assert e.controlled is not None
+
+
+def test_region_without_operator_tier():
+    e = evaluate(station(), 14.2, None, regions.GERMANY)
+    assert e.controlled is None
+    envs = environments(e)
+    assert [x.role for x in envs] == ["controlled", "uncontrolled"]
+    assert envs[0].result is None and envs[0].minutes is None
+    assert envs[0].title == "Controlled environment"
+    assert envs[1].title == "General public" and envs[1].minutes == 6
+    assert not e.too_close
+
+
+def test_region_limit_is_used():
+    s = station()
+    us = evaluate(s, 146.0)
+    it = evaluate(s, 146.0, None, regions.ITALY)
+    assert it.uncontrolled.limit_mw_cm2 < us.uncontrolled.limit_mw_cm2
+
+
+def test_typed_frequency_outside_region_bands_is_labelled():
+    e = evaluate(station(), 5.36, None, regions.AUSTRALIA)
+    assert e.label == "5.36 MHz (outside Australia amateur bands)"
+    assert evaluate(station(), 14.2, None, regions.AUSTRALIA).label == "14.2 MHz"
+
+
+def test_frequency_outside_limit_range_is_a_value_error():
+    with pytest.raises(ValueError):
+        evaluate(station(), 0.05, None, regions.CANADA)
+    with pytest.raises(ValueError):
+        evaluate(station(), 150_000, None, regions.US)
+
+
+def test_plane_wave_flag():
+    assert evaluate(station(), 7.1, None, regions.CANADA).plane_wave
+    assert not evaluate(station(), 14.2, None, regions.CANADA).plane_wave
+    assert not evaluate(station(), 7.1).plane_wave
