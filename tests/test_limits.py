@@ -118,3 +118,61 @@ def test_arpansa_has_no_operator_tier_and_30_min_average():
     assert limits.ARPANSA.public.avg_minutes(146) == 30
     assert limits.ARPANSA.plane_wave_below_mhz == 30.0
     assert limits.ARPANSA.public.label == "General public"
+
+
+EU = [
+    (0.1365, 87 ** 2 / 377),
+    (1.9, (87 / math.sqrt(1.9)) ** 2 / 377),
+    (14.2, 2.0),
+    (446.0, 446.0 / 200),
+    (5760.0, 10.0),
+]
+
+
+@pytest.mark.parametrize("f,s", EU)
+def test_eu_rows(f, s):
+    assert limits.eu_public_w_m2(f) == pytest.approx(s, rel=1e-6)
+
+
+def test_eu_averaging():
+    assert limits.eu_avg_minutes(5760) == 6
+    assert limits.eu_avg_minutes(24000) == pytest.approx(68 / 24 ** 1.05)
+
+
+def test_france_uses_eu_curve_with_its_own_citation():
+    for f, _ in EU:
+        assert limits.FRANCE.public.limit_mw_cm2(f) == limits.EU.public.limit_mw_cm2(f)
+    assert "2002-775" in limits.FRANCE.citation
+
+
+GERMANY = [  # tighter of E and H from Anhang 1b at every frequency
+    (1.9, min((87 / math.sqrt(1.9)) ** 2 / 377, 377 * (0.73 / 1.9) ** 2)),
+    (14.2, min(28 ** 2 / 377, 377 * 0.073 ** 2)),
+    (1296.0, min(1.375 ** 2 * 1296 / 377, 377 * 0.0037 ** 2 * 1296)),
+    (10368.0, min(61 ** 2 / 377, 377 * 0.16 ** 2)),
+]
+
+
+@pytest.mark.parametrize("f,s", GERMANY)
+def test_germany_rows(f, s):
+    assert limits.bimschv_w_m2(f) == pytest.approx(s, rel=1e-6)
+
+
+def test_germany_flags_the_implant_gap():
+    assert any("50527" in n for n in limits.GERMANY.notes)
+    assert limits.GERMANY.public.avg_minutes(24000) == 6
+
+
+def test_no_operator_tier_in_europe():
+    for lim in (limits.EU, limits.FRANCE, limits.GERMANY, limits.ITALY):
+        assert lim.operator is None
+
+
+def test_italy_6_v_per_m():
+    assert limits.italy_w_m2(0.1365) == pytest.approx(36 / 377)
+    assert limits.ITALY.public.limit_mw_cm2(0.1365) == pytest.approx(36 / 377 / 10)
+    for f in (14.2, 146.0, 10368.0):
+        assert limits.italy_w_m2(f) == pytest.approx(0.10)
+        assert limits.ITALY.public.limit_mw_cm2(f) == pytest.approx(0.010)
+    assert limits.ITALY.public.avg_minutes(146) == 1440
+    assert any("6 minutes" in n for n in limits.ITALY.notes)

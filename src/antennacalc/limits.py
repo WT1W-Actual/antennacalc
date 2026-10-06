@@ -188,3 +188,97 @@ ARPANSA = Limit(
     breakpoints=(6.27, 30.0, 400.0, 2000.0),
     plane_wave_below_mhz=30.0,
 )
+
+
+def eu_public_w_m2(f: float) -> float:
+    """Council Recommendation 1999/519/EC, Annex III Table 2 (general public)."""
+    _in(f, 0.1, 300_000.0, "Council Recommendation 1999/519/EC")
+    if f < 0.15:
+        return plane_wave_w_m2(87.0, 5.0)
+    if f < 1:
+        return plane_wave_w_m2(87.0, 0.73 / f)
+    if f < 10:
+        return plane_wave_w_m2(87.0 / math.sqrt(f), 0.73 / f)
+    if f < 400:
+        return 2.0
+    if f < 2000:
+        return f / 200.0
+    return 10.0
+
+
+def eu_avg_minutes(f: float) -> float:
+    return 6.0 if f <= 10_000 else 68.0 / (f / 1000.0) ** 1.05
+
+
+_EU_PUBLIC = Tier("General public", "General public",
+                  lambda f: eu_public_w_m2(f) / 10, eu_avg_minutes)
+_EU_BREAKS = (0.15, 1.0, 10.0, 400.0, 2000.0, 10_000.0)
+
+EU = Limit(
+    name="Council Recommendation 1999/519/EC",
+    citation="Council Recommendation 1999/519/EC, Annex III Table 2 (general public)",
+    min_mhz=0.1, max_mhz=300_000.0, public=_EU_PUBLIC, operator=None,
+    breakpoints=_EU_BREAKS, plane_wave_below_mhz=10.0,
+)
+
+FRANCE = Limit(
+    name="Décret n° 2002-775",
+    citation=("Décret n° 2002-775, annex table 2.2.A (the values of Council "
+              "Recommendation 1999/519/EC)"),
+    min_mhz=0.1, max_mhz=300_000.0, public=_EU_PUBLIC, operator=None,
+    breakpoints=_EU_BREAKS, plane_wave_below_mhz=10.0,
+    notes=("Averaging above 10 GHz follows Council Recommendation 1999/519/EC; "
+           "the décret's own clause was not confirmed.",),
+)
+
+
+def bimschv_w_m2(f: float) -> float:
+    """26. BImSchV Anhang 1b: E and H, 6-minute RMS; tighter of the two."""
+    _in(f, 0.1, 300_000.0, "26. BImSchV")
+    if f < 1:
+        return plane_wave_w_m2(87.0, 0.73 / f)
+    if f < 10:
+        return plane_wave_w_m2(87.0 / math.sqrt(f), 0.73 / f)
+    if f < 400:
+        return plane_wave_w_m2(28.0, 0.073)
+    if f < 2000:
+        return plane_wave_w_m2(1.375 * math.sqrt(f), 0.0037 * math.sqrt(f))
+    return plane_wave_w_m2(61.0, 0.16)
+
+
+GERMANY = Limit(
+    name="26. BImSchV",
+    citation="26. BImSchV Anhang 1b, applied to amateur stations by BEMFV s.3",
+    min_mhz=0.1, max_mhz=300_000.0,
+    public=Tier("General public", "General public",
+                lambda f: bimschv_w_m2(f) / 10, lambda f: 6.0),
+    operator=None,
+    breakpoints=(1.0, 10.0, 400.0, 2000.0),
+    plane_wave_below_mhz=300_000.0,
+    notes=("BEMFV s.3 also applies active-implant values (DIN EN 50527-1 and -2-1) "
+           "from 9 kHz to 50 MHz, which this estimate does not check.",),
+)
+
+
+def italy_w_m2(f: float) -> float:
+    """DPCM 8 luglio 2003, Allegato B Tables 2 and 3: 6 V/m, stated as 0.10 W/m^2
+    from 3 MHz up; below 3 MHz the plane-wave equivalent of 6 V/m and 0.016 A/m."""
+    _in(f, 0.1, 300_000.0, "DPCM 8 luglio 2003")
+    if f < 3.0:
+        return plane_wave_w_m2(e_v_m=6.0, h_a_m=0.016)
+    return 0.10
+
+
+ITALY = Limit(
+    name="DPCM 8 luglio 2003",
+    citation="DPCM 8 luglio 2003, Allegato B Tables 2 and 3 (6 V/m)",
+    min_mhz=0.1, max_mhz=300_000.0,
+    public=Tier("General public", "General public",
+                lambda f: italy_w_m2(f) / 10, lambda f: 1440.0),
+    operator=None, breakpoints=(3.0,), plane_wave_below_mhz=3.0,
+    notes=("Italy's 6 V/m attention value applies in buildings where people stay "
+           "4 hours or more, and its quality objective in busy outdoor areas.",
+           "Italy also sets exposure limits averaged over 6 minutes (DPCM 8 luglio "
+           "2003, Allegato B Table 1: 20 V/m from 3 to 3000 MHz); this calculator "
+           "checks the 24-hour attention value only."),
+)
