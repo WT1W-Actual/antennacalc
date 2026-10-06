@@ -109,12 +109,16 @@ def text_block(text: str, size: float, bold: bool = False, color=TEXT,
 
 def heading(text: str) -> list[Block]:
     size = 14.0
+    lead = size * 1.25
+    lines = wrap(text, BODY_W, size, True)  # long multi-segment band labels wrap
+    rule_y = 14 + size + (len(lines) - 1) * lead + 5
 
     def draw(page: Page, top: float) -> None:
-        page.text(MARGIN, top - 14 - size, text, size, True, ACCENT)
-        page.line(MARGIN, top - 14 - size - 5, MARGIN + BODY_W, top - 14 - size - 5, ACCENT, 1.5)
+        for i, ln in enumerate(lines):
+            page.text(MARGIN, top - 14 - size - i * lead, ln, size, True, ACCENT)
+        page.line(MARGIN, top - rule_y, MARGIN + BODY_W, top - rule_y, ACCENT, 1.5)
 
-    return [Block(14 + size + 12, draw)]
+    return [Block(14 + size + (len(lines) - 1) * lead + 12, draw)]
 
 
 def results(e: Evaluation) -> list[Block]:

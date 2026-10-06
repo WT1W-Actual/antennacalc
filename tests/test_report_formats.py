@@ -123,6 +123,22 @@ def test_text_report_lines_fit_72_columns():
         assert len(line) <= 72, line
 
 
+def region_all_bands(s, region):
+    return [evaluate(s, region.eval_freq_mhz(b), b, region) for b in region.bands]
+
+
+@pytest.mark.parametrize("region", regions.REGIONS, ids=lambda r: r.name)
+def test_text_report_fits_72_columns_for_every_band_of_every_region(region):
+    s = station()
+    out = build_text_report(s, region_all_bands(s, region), WHEN)
+    for line in out.splitlines():
+        assert len(line) <= 72, line
+    for e in region_all_bands(s, region):
+        # the long label still reaches the reader, wrapped, in the section heading
+        if e.band:
+            assert e.band.name in out
+
+
 def test_text_report_warns_when_too_close():
     s = station(tx_power_w=0.01, gain_dbi=-10)
     assert "WARNING:" in build_text_report(s, [evaluate(s, 146.0)], WHEN)
@@ -277,6 +293,26 @@ def test_pdf_band_heading_never_ends_a_page():
         shown = re.findall(r"\((.*?)\) Tj", t)
         body = [x for x in shown if not x.startswith("Page ")]
         assert not body[-1].startswith("Band:"), body[-1]
+
+
+def _pdf_text_runs(data: bytes):
+    """(x, size, bold, text) of every text run drawn in the PDF."""
+    for t in page_texts(data):
+        for m in re.finditer(r"BT /F(\d) (\S+) Tf [\d. ]+ rg (\S+) (\S+) Td \((.*)\) Tj ET", t):
+            text = re.sub(r"\\(.)", r"\1", m.group(5))
+            yield float(m.group(3)), float(m.group(2)), m.group(1) == "2", text
+
+
+@pytest.mark.parametrize("region", regions.REGIONS, ids=lambda r: r.name)
+def test_pdf_text_stays_inside_the_page_for_every_region(region):
+    from antennacalc.pdf import PAGE_W
+    from antennacalc.pdf_report import MARGIN
+    s = station()
+    data = render_report("pdf", s, region_all_bands(s, region), WHEN)
+    runs = list(_pdf_text_runs(data))
+    assert runs
+    for x, size, bold, text in runs:
+        assert x + string_width(text, size, bold) <= PAGE_W - MARGIN + 0.5, text
 
 
 def test_pdf_escapes_and_replaces_text():

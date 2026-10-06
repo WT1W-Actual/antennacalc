@@ -277,7 +277,10 @@ def build_text_report(
             )
 
     for e in evaluations:
-        out += ["", bar, f"{'BAND' if e.band else 'FREQUENCY'}: {e.label}", bar]
+        out += ["", bar]
+        out += textwrap.wrap(f"{'BAND' if e.band else 'FREQUENCY'}: {e.label}", WIDTH,
+                             subsequent_indent="  ")
+        out += [bar]
         out += _text_rows(frequency_rows(station, e), 0)
         for env in environments(e):
             if env.result is None:
