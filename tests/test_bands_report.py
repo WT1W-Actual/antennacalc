@@ -116,3 +116,28 @@ def test_report_escapes_user_text():
 def test_report_warns_when_too_close():
     s = station(tx_power_w=0.01, gain_dbi=-10)
     assert "Warning:" in build_report(s, [evaluate(s, 146.0)])
+
+
+def test_us_13cm_is_two_segments():
+    b = bands.by_name("13 cm")
+    assert b.segments == ((2300.0, 2310.0), (2390.0, 2450.0))
+    assert b.range_text == "2.3-2.31 GHz, 2.39-2.45 GHz"
+
+
+def test_us_9cm_removed():
+    with pytest.raises(KeyError):
+        bands.by_name("9 cm")
+
+
+def test_segments_must_ascend_without_overlap():
+    with pytest.raises(ValueError):
+        bands.seg("x", (5, 6), (5.5, 7))
+    with pytest.raises(ValueError):
+        bands.seg("x", (6, 5))
+    with pytest.raises(ValueError):
+        bands.seg("x")
+
+
+def test_eval_freq_checks_every_segment_edge():
+    b = bands.seg("x", (14.0, 14.1), (14.3, 14.35))
+    assert b.eval_freq_mhz == 14.35

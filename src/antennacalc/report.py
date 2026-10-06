@@ -239,8 +239,10 @@ def build_text_report(
         out += ["", "SUMMARY: MINIMUM SAFE DISTANCE (feet)", rule]
         out.append(f"  {'Band':<28}{'MHz':>10}{'Controlled':>15}{'Uncontrolled':>15}")
         for e in evaluations:
+            # Multi-segment labels overrun the column; the name alone fits.
+            name = e.label if len(e.label) <= 28 or not e.band else e.band.name
             out.append(
-                f"  {e.label:<28}{e.freq_mhz:>10g}"
+                f"  {name:<28}{e.freq_mhz:>10g}"
                 f"{e.controlled.safe_distance_ft:>12.2f} ft"
                 f"{e.uncontrolled.safe_distance_ft:>12.2f} ft"
             )
