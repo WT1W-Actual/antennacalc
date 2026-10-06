@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 HINTS = {
+    "region": (
+        "Where the station is. Sets the amateur bands you can pick and the exposure "
+        "limits the distances are calculated against."
+    ),
     "bands": (
         "Tick one or more US amateur bands. Each band is evaluated at its most "
         "conservative frequency (the edge with the lowest allowed power density)."
