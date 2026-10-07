@@ -1,12 +1,14 @@
 # antennacalc
 
 Cross-platform (Windows, macOS, Linux) amateur radio RF exposure calculator. It estimates
-the minimum safe distance from your antenna under the FCC MPE limits (47 CFR 1.1310,
-OET Bulletin 65), for both controlled and uncontrolled environments. Results are checked
-against the [ARRL RF Exposure Calculator](https://www.arrl.org/rf-exposure-calculator).
+the minimum safe distance from your antenna for seven regions (United States, Canada,
+Australia, Germany, France, Italy and Europe (CEPT)), using each region's own exposure
+limits and the far-field method of FCC OET Bulletin 65. The United States and Canada show
+controlled and uncontrolled limits; the other regions show the general-public limit only.
+Every source is listed in [docs/SOURCES.md](docs/SOURCES.md). US results are checked against the [ARRL RF Exposure Calculator](https://www.arrl.org/rf-exposure-calculator).
 
 - Choose an antenna type (pre-fills gain and ground reflection) or enter your own gain
-- Evaluate one or more US amateur bands (630 m through 4 mm), or a specific frequency
+- Pick a region, then evaluate one or more of its amateur bands, or a specific frequency
 - Enter transmitter power, feedline loss, mode duty cycle and transmit time
 - Hover tooltips on every field, a Help guide, and a Reset all button
 - Built-in feedline loss estimator (cable type, length, SWR, connectors), recalculated per band
@@ -35,6 +37,7 @@ or without installing: `python -m antennacalc` with `src` on `PYTHONPATH`
 ## Documentation
 
 - [docs/ABOUT.md](docs/ABOUT.md): what each input and result means, how it is calculated, code layout
+- [docs/SOURCES.md](docs/SOURCES.md): the limit documents used for each region
 - [docs/BUILDING.md](docs/BUILDING.md): how to build the app from scratch on Windows, macOS and Linux
 
 ## Tests

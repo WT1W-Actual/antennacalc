@@ -6,7 +6,7 @@ from datetime import datetime
 
 import pytest
 
-from antennacalc import bands
+from antennacalc import bands, regions
 from antennacalc.evaluate import Station, evaluate
 from antennacalc.pdf import string_width
 from antennacalc.report import (
@@ -29,7 +29,7 @@ def station(**kw):
 
 
 def all_bands(s):
-    return [evaluate(s, b.eval_freq_mhz, b) for b in bands.BANDS]
+    return [evaluate(s, regions.US.eval_freq_mhz(b), b) for b in bands.BANDS]
 
 
 # --- choosing a format from the save dialog ---------------------------------
@@ -110,7 +110,7 @@ def test_text_report_single():
 def test_text_report_multi_has_summary_and_every_band():
     s = station()
     sel = [bands.by_name(n) for n in ("20 m", "2 m", "70 cm")]
-    out = build_text_report(s, [evaluate(s, b.eval_freq_mhz, b) for b in sel], WHEN)
+    out = build_text_report(s, [evaluate(s, regions.US.eval_freq_mhz(b), b) for b in sel], WHEN)
     assert "SUMMARY: MINIMUM SAFE DISTANCE" in out
     for b in sel:
         assert f"BAND: {b.label}" in out
@@ -121,6 +121,22 @@ def test_text_report_lines_fit_72_columns():
     s = station()
     for line in build_text_report(s, all_bands(s), WHEN).splitlines():
         assert len(line) <= 72, line
+
+
+def region_all_bands(s, region):
+    return [evaluate(s, region.eval_freq_mhz(b), b, region) for b in region.bands]
+
+
+@pytest.mark.parametrize("region", regions.REGIONS, ids=lambda r: r.name)
+def test_text_report_fits_72_columns_for_every_band_of_every_region(region):
+    s = station()
+    out = build_text_report(s, region_all_bands(s, region), WHEN)
+    for line in out.splitlines():
+        assert len(line) <= 72, line
+    for e in region_all_bands(s, region):
+        # the long label still reaches the reader, wrapped, in the section heading
+        if e.band:
+            assert e.band.name in out
 
 
 def test_text_report_warns_when_too_close():
@@ -146,7 +162,7 @@ def test_csv_has_one_row_per_band_with_every_field():
     rows = read_csv(render_report("csv", s, evs, WHEN))
     assert len(rows) == len(evs)
     assert list(rows[0]) == [
-        "Generated", "Program", "Band", "Band range", "Frequency evaluated (MHz)",
+        "Generated", "Program", "Region", "Exposure limits", "Band", "Band range", "Frequency evaluated (MHz)",
         "Antenna type", "Antenna gain (dBi)", "Transmitter power (W)", "Feedline",
         "Mode", "Duty cycle (%)", "Transmit minutes", "Receive minutes",
         "Ground reflection", "Feedline loss at this frequency (dB)", "Power at antenna (W)",
@@ -154,11 +170,13 @@ def test_csv_has_one_row_per_band_with_every_field():
         "Controlled max allowed power density (mW/cm²)",
         "Controlled time averaged power (W)", "Controlled EIRP (W)",
         "Controlled minimum safe distance (ft)", "Controlled minimum safe distance (m)",
+        "Controlled note",
         "Uncontrolled averaging period (min)",
         "Uncontrolled max allowed power density (mW/cm²)",
         "Uncontrolled time averaged power (W)", "Uncontrolled EIRP (W)",
         "Uncontrolled minimum safe distance (ft)", "Uncontrolled minimum safe distance (m)",
-        "Under 20 cm",
+        "Uncontrolled note",
+        "Under 20 cm", "Notes",
     ]
     for row, e in zip(rows, evs):
         assert row["Band"] == e.band.name
@@ -253,7 +271,7 @@ def test_pdf_page_count_matches_tree():
 def test_pdf_contains_report_text():
     s = station()
     sel = [bands.by_name(n) for n in ("20 m", "2 m")]
-    data = render_report("pdf", s, [evaluate(s, b.eval_freq_mhz, b) for b in sel], WHEN)
+    data = render_report("pdf", s, [evaluate(s, regions.US.eval_freq_mhz(b), b) for b in sel], WHEN)
     text = "".join(page_texts(data))
     for needle in ("(Antenna RF Exposure Report)", "(Summary: minimum safe distance)",
                    "(Controlled environment)", "(Uncontrolled environment)",
@@ -275,6 +293,26 @@ def test_pdf_band_heading_never_ends_a_page():
         shown = re.findall(r"\((.*?)\) Tj", t)
         body = [x for x in shown if not x.startswith("Page ")]
         assert not body[-1].startswith("Band:"), body[-1]
+
+
+def _pdf_text_runs(data: bytes):
+    """(x, size, bold, text) of every text run drawn in the PDF."""
+    for t in page_texts(data):
+        for m in re.finditer(r"BT /F(\d) (\S+) Tf [\d. ]+ rg (\S+) (\S+) Td \((.*)\) Tj ET", t):
+            text = re.sub(r"\\(.)", r"\1", m.group(5))
+            yield float(m.group(3)), float(m.group(2)), m.group(1) == "2", text
+
+
+@pytest.mark.parametrize("region", regions.REGIONS, ids=lambda r: r.name)
+def test_pdf_text_stays_inside_the_page_for_every_region(region):
+    from antennacalc.pdf import PAGE_W
+    from antennacalc.pdf_report import MARGIN
+    s = station()
+    data = render_report("pdf", s, region_all_bands(s, region), WHEN)
+    runs = list(_pdf_text_runs(data))
+    assert runs
+    for x, size, bold, text in runs:
+        assert x + string_width(text, size, bold) <= PAGE_W - MARGIN + 0.5, text
 
 
 def test_pdf_escapes_and_replaces_text():
@@ -303,3 +341,91 @@ def test_string_width_uses_helvetica_metrics():
     assert string_width("Hello", 10, bold=True) == pytest.approx(
         (722 + 556 + 278 + 278 + 611) / 100)
     assert string_width("", 12) == 0
+
+
+def de_evals(s):
+    sel = [regions.GERMANY.find(n) for n in ("160 m", "2 m")]
+    return [evaluate(s, regions.GERMANY.eval_freq_mhz(b), b, regions.GERMANY) for b in sel]
+
+
+def test_every_format_names_region_and_citation():
+    s = station()
+    evs = de_evals(s)
+    html = build_report(s, evs, WHEN)
+    txt = build_text_report(s, evs, WHEN)
+    for out in (html, txt):
+        assert "Germany" in out and "26. BImSchV" in out
+        assert "plane-wave equivalent" in out
+        assert "50527" in out
+    rows = read_csv(render_report("csv", s, evs, WHEN))
+    assert rows[0]["Region"] == "Germany"
+    assert "26. BImSchV" in rows[0]["Exposure limits"]
+    assert "plane-wave equivalent" in rows[0]["Notes"]
+    assert "implant" in rows[0]["Notes"].lower()
+
+
+def test_missing_tier_prints_na():
+    s = station()
+    evs = de_evals(s)
+    html = build_report(s, evs, WHEN)
+    assert "Not applicable: Germany sets no controlled tier" in html
+    assert ">n/a<" in html
+    txt = build_text_report(s, evs, WHEN)
+    assert "n/a" in txt
+    for line in txt.splitlines():
+        assert len(line) <= 72, line
+    row = read_csv(render_report("csv", s, evs, WHEN))[0]
+    assert row["Controlled minimum safe distance (ft)"] == ""
+    assert row["Controlled note"].startswith("Not applicable")
+    pdf = render_report("pdf", s, evs, WHEN)
+    assert pdf.startswith(b"%PDF")
+    text = "".join(page_texts(pdf))
+    assert "Germany" in text
+    assert regions.GERMANY.limit.citation.split()[0] in text
+    assert "n/a" in text
+    assert "Not applicable: Germany sets no controlled tier" in text
+    assert "plane-wave equivalent" in "".join(
+        page_texts(render_report("pdf", s, [evaluate(s, 14.2, None, regions.AUSTRALIA)], WHEN)))
+
+
+def test_averaging_minutes_use_three_significant_figures():
+    s = station()
+    ev = evaluate(s, 76000.0, None, regions.CANADA)
+    assert "0.856 minute average" in build_report(s, [ev], WHEN)
+    assert "0.856 minute average" in build_text_report(s, [ev], WHEN)
+    assert "0.856 minute average" in "".join(page_texts(render_report("pdf", s, [ev], WHEN)))
+    assert "0.856258" not in build_report(s, [ev], WHEN)
+
+
+def test_region_tier_labels_and_minutes_in_reports():
+    s = station()
+    e = evaluate(s, 146.0, None, regions.AUSTRALIA)
+    html = build_report(s, [e], WHEN)
+    assert "General public" in html and "(30 minute average)" in html
+    txt = build_text_report(s, [e], WHEN)
+    assert "GENERAL PUBLIC (30 minute average)" in txt
+
+
+def test_us_report_has_region_rows_and_no_plane_wave_note():
+    s = station()
+    html = build_report(s, [evaluate(s, 7.1)], WHEN)
+    assert "United States" in html and "47 CFR 1.1310" in html
+    assert "plane-wave equivalent" not in html
+
+
+def test_csv_notes_column_is_last_and_prefixes_are_stable():
+    s = station()
+    header = list(read_csv(render_report("csv", s, de_evals(s), WHEN))[0])
+    assert header[-1] == "Notes"
+    assert "Controlled minimum safe distance (ft)" in header
+    assert "Uncontrolled minimum safe distance (ft)" in header
+
+
+def test_csv_notes_follow_the_row_and_the_region():
+    s = station()
+    it = regions.ITALY
+    b = it.find("2 m")
+    rows = read_csv(render_report("csv", s, [evaluate(s, it.eval_freq_mhz(b), b, it)], WHEN))
+    assert "24-hour" in rows[0]["Notes"]
+    us = read_csv(render_report("csv", s, [evaluate(s, 146.0)], WHEN))[0]
+    assert "plane-wave" not in us["Notes"]

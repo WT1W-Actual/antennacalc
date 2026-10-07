@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 HINTS = {
+    "region": (
+        "Where the station is. Sets the amateur bands you can pick and the exposure "
+        "limits the distances are calculated against."
+    ),
     "bands": (
-        "Tick one or more US amateur bands. Each band is evaluated at its most "
+        "Tick one or more amateur bands for the selected region. Each band is evaluated at its most "
         "conservative frequency (the edge with the lowest allowed power density)."
     ),
     "freq": (
-        "Evaluate one specific frequency in MHz (0.3 to 100000). Typing here "
+        "Evaluate one specific frequency in MHz, within the selected region's limit range. Typing here "
         "clears the band selection, and ticking a band clears this."
     ),
     "antenna": (
@@ -67,8 +71,16 @@ HELP_TITLE = "antennacalc help"
 HELP_TEXT = """\
 WHAT THIS DOES
 Estimates the minimum safe distance from your antenna so that RF exposure stays \
-within FCC limits (47 CFR 1.1310, OET Bulletin 65), the same method as the ARRL \
-RF Exposure Calculator.
+within the limits that apply where you operate, using the far-field method of FCC \
+OET Bulletin 65 (the same method as the ARRL RF Exposure Calculator).
+
+REGION
+Choose where the station is. The region sets the bands you can pick and the \
+exposure limits: FCC 47 CFR 1.1310 in the United States, Health Canada Safety \
+Code 6 in Canada, ARPANSA RPS S-1 in Australia, each country's own rules in \
+Germany (26. BImSchV), France and Italy (DPCM 8 luglio 2003), and Council \
+Recommendation 1999/519/EC for the rest of Europe (CEPT). docs/SOURCES.md lists \
+every document used.
 
 HOW TO USE IT
 1. Choose one or more amateur bands, or type a specific frequency.
@@ -79,9 +91,11 @@ report to keep them all.
 
 CONTROLLED vs UNCONTROLLED
 Controlled limits apply to people who know about and can control their exposure, \
-such as licensees and their families on the property. They are averaged over \
-6 minutes. Uncontrolled limits apply to the general public, such as neighbors, \
-and are stricter, averaged over 30 minutes.
+such as licensees and their families on the property. Uncontrolled (general \
+public) limits apply to everyone else and are stricter. The United States and \
+Canada have both tiers for amateurs. Australia and the European entries apply \
+the general-public limit only, so the controlled side shows "n/a". Averaging \
+times differ by region and are shown on each panel.
 
 WHAT AFFECTS THE ANSWER
 - Duty cycle: SSB speech averages well below peak power. FM, RTTY and digital \

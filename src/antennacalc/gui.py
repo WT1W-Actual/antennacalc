@@ -6,10 +6,10 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from typing import Callable, Optional
 
-from . import calc, feedline
+from . import calc, feedline, regions
 from .antennas import ANTENNAS, by_name
-from .bands import BANDS, Band
-from .evaluate import Evaluation, Station, evaluate
+from .bands import Band
+from .evaluate import NOT_APPLICABLE, Evaluation, Station, evaluate
 from .feedline import FeedlineConfig
 from .helptext import HELP_TEXT, HELP_TITLE, HINTS
 from .report import FORMATS, format_for_path, render_report
@@ -29,11 +29,10 @@ RESULT_FIELDS = [
 BOLD = ("TkDefaultFont", 10, "bold")
 BAND_COLUMNS = 4
 
-DISCLAIMER = (
-    "Estimate only (FCC OET Bulletin 65 far-field model). Not valid for antennas "
-    "within 20 cm (8 in) of a person. Run it for each antenna and consider "
-    "all transmitters."
-)
+def disclaimer_for(region: regions.Region) -> str:
+    return (f"Estimate only (OET Bulletin 65 far-field model, {region.limit.name} limits). "
+            "Not valid for antennas within 20 cm (8 in) of a person. Run it for each "
+            "antenna and consider all transmitters.")
 
 
 class FeedlineDialog(tk.Toplevel):
@@ -172,7 +171,11 @@ class App(ttk.Frame):
         self.rx_min = tk.StringVar(value="4")
         self.gain = tk.StringVar(value=str(ANTENNAS[0].gain_dbi))
         self.ground = tk.BooleanVar(value=ANTENNAS[0].ground)
-        self.band_vars = {b.name: tk.BooleanVar() for b in BANDS}
+        self.region_var = tk.StringVar(value=regions.DEFAULT.name)
+        self.band_prompt = tk.StringVar()
+        self.disclaimer_text = tk.StringVar()
+        self.na_text = tk.StringVar()
+        self.band_vars: dict[str, tk.BooleanVar] = {}
         self.shown = tk.StringVar()
         self.note = tk.StringVar()
         self.result = tk.StringVar()
@@ -189,10 +192,15 @@ class App(ttk.Frame):
         self.columnconfigure(1, weight=1)
         self._build_inputs(left)
         self._build_results(right)
+        self._apply_region(keep=set())
 
         self.freq.trace_add("write", self._freq_edited)
         self.loss.trace_add("write", self._loss_edited)
         self.save_btn.state(["disabled"])
+
+    @property
+    def region(self) -> regions.Region:
+        return regions.by_name(self.region_var.get())
 
     def _build_inputs(self, parent: ttk.Frame) -> None:
         def row(r: int, label: str, widget: tk.Widget, hint: str = "") -> None:
@@ -241,20 +249,27 @@ class App(ttk.Frame):
 
         fb = ttk.LabelFrame(parent, text="Frequency", padding=8)
         fb.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 8))
-        bl = ttk.Label(fb, text="Select one or more US amateur bands:")
-        bl.grid(row=0, column=0, columnspan=BAND_COLUMNS, sticky="w")
+        rf = ttk.Frame(fb)
+        rf.grid(row=0, column=0, columnspan=BAND_COLUMNS, sticky="w", pady=(0, 6))
+        rl = ttk.Label(rf, text="Region:")
+        rl.pack(side="left")
+        rc = ttk.Combobox(rf, textvariable=self.region_var, state="readonly", width=18,
+                          values=[r.name for r in regions.REGIONS])
+        rc.pack(side="left", padx=6)
+        rc.bind("<<ComboboxSelected>>", self._region_changed)
+        self.region_tip = Tooltip(rc, "")
+        Tooltip(rl, HINTS["region"])
+        bl = ttk.Label(fb, textvariable=self.band_prompt)
+        bl.grid(row=1, column=0, columnspan=BAND_COLUMNS, sticky="w")
         Tooltip(bl, HINTS["bands"])
-        for i, b in enumerate(BANDS):
-            ttk.Checkbutton(fb, text=b.name, variable=self.band_vars[b.name],
-                            command=self._band_clicked).grid(
-                row=1 + i // BAND_COLUMNS, column=i % BAND_COLUMNS, sticky="w", padx=(0, 10))
-        last = 1 + (len(BANDS) - 1) // BAND_COLUMNS + 1
+        self.band_grid = ttk.Frame(fb)
+        self.band_grid.grid(row=2, column=0, columnspan=BAND_COLUMNS, sticky="w")
         bb = ttk.Frame(fb)
-        bb.grid(row=last, column=0, columnspan=BAND_COLUMNS, sticky="w", pady=(4, 6))
+        bb.grid(row=3, column=0, columnspan=BAND_COLUMNS, sticky="w", pady=(4, 6))
         ttk.Button(bb, text="Select all", command=self._select_all).pack(side="left")
         ttk.Button(bb, text="Clear", command=self._clear_bands).pack(side="left", padx=6)
         ef = ttk.Frame(fb)
-        ef.grid(row=last + 1, column=0, columnspan=BAND_COLUMNS, sticky="w")
+        ef.grid(row=4, column=0, columnspan=BAND_COLUMNS, sticky="w")
         fl = ttk.Label(ef, text="or a specific frequency (MHz):")
         fl.pack(side="left")
         fe = ttk.Entry(ef, textvariable=self.freq, width=12)
@@ -282,40 +297,60 @@ class App(ttk.Frame):
         Tooltip(self.picker, HINTS["picker"])
         ttk.Label(parent, textvariable=self.note, foreground="gray30",
                   wraplength=400, justify="left").grid(row=1, column=0, sticky="w", pady=(4, 0))
+        self.panel_boxes: dict[bool, ttk.LabelFrame] = {}
+        self.panel_rows: dict[bool, list[tk.Widget]] = {}
+        self.panel_na: dict[bool, ttk.Label] = {}
         self.panels = {
-            True: self._result_panel(parent, 2, "Controlled environment (6 min average)"),
-            False: self._result_panel(parent, 3, "Uncontrolled environment (30 min average)"),
+            True: self._result_panel(parent, 2, "Controlled environment", True),
+            False: self._result_panel(parent, 3, "Uncontrolled environment", False),
         }
         ttk.Label(parent, textvariable=self.result, foreground="firebrick",
-                  wraplength=400).grid(row=4, column=0, sticky="w")
+                  wraplength=400).grid(row=5, column=0, sticky="w")
         self.save_btn = ttk.Button(parent, text="Save report…", command=self.save_report)
-        self.save_btn.grid(row=5, column=0, pady=8)
+        self.save_btn.grid(row=6, column=0, pady=8)
         Tooltip(self.save_btn, HINTS["save"])
-        ttk.Label(parent, text=DISCLAIMER, wraplength=400, foreground="gray40").grid(
-            row=6, column=0, sticky="w", pady=(6, 0))
+        ttk.Label(parent, textvariable=self.disclaimer_text, wraplength=400,
+                  foreground="gray40").grid(
+            row=7, column=0, sticky="w", pady=(6, 0))
         parent.columnconfigure(0, weight=1)
 
-    def _result_panel(self, parent: tk.Misc, grid_row: int, title: str) -> dict[str, tk.StringVar]:
+    def _result_panel(self, parent: tk.Misc, grid_row: int, title: str,
+                      key: bool) -> dict[str, tk.StringVar]:
         box = ttk.LabelFrame(parent, text=title, padding=8)
+        ctrl = key
+        self.panel_boxes[ctrl] = box
         box.grid(row=grid_row, column=0, sticky="ew", pady=4)
         box.columnconfigure(1, weight=1)
         vars_: dict[str, tk.StringVar] = {}
+        rows: list[tk.Widget] = []
         for i, (key, label) in enumerate(RESULT_FIELDS):
             vars_[key] = tk.StringVar(value="—")
             name = ttk.Label(box, text=label + ":")
             name.grid(row=i, column=0, sticky="w")
-            ttk.Label(box, textvariable=vars_[key], font=BOLD).grid(
-                row=i, column=1, sticky="e")
+            val = ttk.Label(box, textvariable=vars_[key], font=BOLD)
+            val.grid(row=i, column=1, sticky="e")
+            rows += [name, val]
             hint = {"avg": "avg", "eirp": "eirp", "ft": "dist", "m": "dist",
                     "loss": "loss"}.get(key)
             if hint:
                 Tooltip(name, HINTS[hint])
+        self.panel_rows[ctrl] = rows
+        na = ttk.Label(box, textvariable=self.na_text, foreground="gray30",
+                       wraplength=400, justify="left")
+        na.grid(row=0, column=0, columnspan=2, sticky="w")
+        na.grid_remove()
+        self.panel_na[ctrl] = na
         return vars_
+
+    def _show_na_panel(self, ctrl: bool, on: bool) -> None:
+        for w in self.panel_rows[ctrl]:
+            (w.grid_remove if on else w.grid)()
+        (self.panel_na[ctrl].grid if on else self.panel_na[ctrl].grid_remove)()
 
     # --- frequency selection -------------------------------------------------
 
     def selected_bands(self) -> list[Band]:
-        return [b for b in BANDS if self.band_vars[b.name].get()]
+        return [b for b in self.region.bands if self.band_vars[b.name].get()]
 
     def _band_clicked(self) -> None:
         if self.selected_bands():
@@ -339,7 +374,7 @@ class App(ttk.Frame):
             return float(self.freq.get())
         except ValueError:
             bands = self.selected_bands()
-            return bands[0].eval_freq_mhz if bands else None
+            return self.region.eval_freq_mhz(bands[0]) if bands else None
 
     # --- feedline ------------------------------------------------------------
 
@@ -379,7 +414,7 @@ class App(ttk.Frame):
         bands = self.selected_bands()
         if not bands:
             raise ValueError("Select at least one band or enter a frequency")
-        return [(b.eval_freq_mhz, b) for b in bands]
+        return [(self.region.eval_freq_mhz(b), b) for b in bands]
 
     def _build_station(self) -> Station:
         if self.feedline_cfg is None:
@@ -402,14 +437,9 @@ class App(ttk.Frame):
     def calculate(self) -> None:
         try:
             station = self._build_station()
-            evals = [evaluate(station, f, band) for f, band in self._targets()]
+            evals = [evaluate(station, f, band, self.region) for f, band in self._targets()]
         except ValueError as exc:
-            self.station, self.evaluations = None, []
-            self.picker["values"] = []
-            self.shown.set("")
-            self.note.set("")
-            self._clear_panels()
-            self.save_btn.state(["disabled"])
+            self._clear_results()
             self.result.set(f"Input error: {exc}")
             return
         self.station, self.evaluations = station, evals
@@ -447,13 +477,53 @@ class App(ttk.Frame):
         self.rx_min.set("4")
         self.antenna.set(ANTENNAS[0].name)
         self._antenna_changed()
+        self._clear_results()
+
+    def _clear_results(self) -> None:
         self.station, self.evaluations = None, []
         self.picker["values"] = []
         self.shown.set("")
         self.note.set("")
         self.result.set("")
+        r = self.region
+        self.na_text.set(NOT_APPLICABLE.format(region=r.name)
+                         if r.limit.tier(True) is None else "")
         self._clear_panels()
         self.save_btn.state(["disabled"])
+
+    def _build_band_grid(self, keep: set[str]) -> None:
+        for child in self.band_grid.winfo_children():
+            child.destroy()
+        self.band_vars = {b.name: tk.BooleanVar(value=b.name in keep) for b in self.region.bands}
+        for i, b in enumerate(self.region.bands):
+            ttk.Checkbutton(self.band_grid, text=b.name, variable=self.band_vars[b.name],
+                            command=self._band_clicked).grid(
+                row=i // BAND_COLUMNS, column=i % BAND_COLUMNS, sticky="w", padx=(0, 10))
+
+    def _apply_region(self, keep: set[str]) -> None:
+        r = self.region
+        self.band_prompt.set(f"Select one or more {r.name} amateur bands:")
+        self.disclaimer_text.set(disclaimer_for(r))
+        self.region_tip.text = f"Exposure limits: {r.limit.citation}"
+        self._build_band_grid(keep)
+        self._title_panels(None)
+
+    def _region_changed(self, _event: object = None) -> None:
+        keep = {n for n, v in self.band_vars.items() if v.get()}
+        self._apply_region(keep)
+        self._clear_results()
+
+    def _title_panels(self, e: Optional[Evaluation]) -> None:
+        lim = self.region.limit
+        for ctrl in (True, False):
+            tier = lim.tier(ctrl)
+            self._show_na_panel(ctrl, tier is None)
+            if tier is None:
+                text = "Controlled environment"
+            else:
+                f = e.freq_mhz if e else lim.min_mhz
+                text = f"{tier.label} ({tier.avg_minutes(f):.3g} min average)"
+            self.panel_boxes[ctrl].configure(text=text)
 
     def _clear_panels(self) -> None:
         for panel in self.panels.values():
@@ -464,8 +534,13 @@ class App(ttk.Frame):
         e = next((x for x in self.evaluations if x.label == self.shown.get()), None)
         if e is None or self.station is None:
             return
+        self._title_panels(e)
         for ctrl, r in ((True, e.controlled), (False, e.uncontrolled)):
             p = self.panels[ctrl]
+            if r is None:
+                for v in p.values():
+                    v.set("n/a")
+                continue
             p["tx"].set(f"{self.station.tx_power_w:.4g} W")
             p["loss"].set(f"{e.loss_db:.2f} dB")
             p["ant"].set(f"{e.power_at_antenna_w:.4g} W")
@@ -474,11 +549,13 @@ class App(ttk.Frame):
             p["eirp"].set(f"{r.eirp_w:.4g} W")
             p["ft"].set(f"{r.safe_distance_ft:.2f} ft")
             p["m"].set(f"{r.safe_distance_m:.2f} m")
+        extra = (f" Limit is the plane-wave equivalent of {e.region.limit.name}'s "
+                 "E and H limits." if e.plane_wave else "")
         if e.band:
             self.note.set(f"Evaluated at {e.freq_mhz:g} MHz, the most conservative "
-                          f"frequency in the {e.band.range_text} band.")
+                          f"frequency in the {e.band.range_text} band." + extra)
         else:
-            self.note.set(f"Evaluated at {e.freq_mhz:g} MHz.")
+            self.note.set(f"Evaluated at {e.freq_mhz:g} MHz." + extra)
         self.result.set(
             "Distance is under 20 cm; results are not reliable that close."
             if e.too_close else ""
