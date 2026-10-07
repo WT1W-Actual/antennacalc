@@ -99,8 +99,8 @@ Pushing a tag that starts with `v` (matching the version in `pyproject.toml` and
 them to a GitHub release:
 
 ```
-git tag v0.3.0
-git push origin v0.3.0
+git tag v0.4.0
+git push origin v0.4.0
 ```
 
 Pushes to `main` and pull requests run the tests and build, with the apps available as

@@ -116,9 +116,12 @@ After calculating, press **Save report…** and pick a file type in the save dia
 - **Plain text** (`.txt`): 72 columns wide, for email or a station log.
 - **CSV spreadsheet** (`.csv`): one header row, then one row per band or frequency with
   every field: the station inputs (repeated on each row), the frequency details, and the
-  limit, averaged power, EIRP and safe distances for both environments, plus a column
-  flagging distances under 20 cm. Numbers carry no units; the units are in the column
-  names. The file is UTF-8 with a byte-order mark so Excel reads it correctly.
+  region and limit citation, averaged power, EIRP and safe distances. The Controlled and
+  Uncontrolled columns are retained in every region; where a region has no controlled
+  tier, those fields are blank and its note explains that the result is not applicable.
+  A Notes column carries limit-basis and regional notes, and another column flags
+  distances under 20 cm. Numbers carry no units; the units are in the column names. The
+  file is UTF-8 with a byte-order mark so Excel reads it correctly.
 
 Typing a file name that ends in `.html`, `.pdf`, `.txt` or `.csv` picks that format regardless of
 the type selected. The confirmation that follows has a button (Show in Finder, Show in
@@ -130,22 +133,26 @@ always covers everything you just calculated:
   minimum safe distances for every band (each row links to that band's section), then a
   full section for each band.
 
-Each band section lists the frequency evaluated, power at the antenna, and color-coded
-controlled (blue) and uncontrolled (orange) panels with one value per line and the minimum
-safe distances in bold. The report ends with the disclaimer and flags any distance under
-20 cm. The HTML uses inline styling only (no external files, scripts or network access),
-and all text is escaped. The PDF shows the two environments side by side in one table per
-band, keeps each band's section on a single page, and uses the standard Helvetica font, so
-nothing is embedded; characters outside the Windows Latin-1 set print as `?`.
+Each band section names the region and exposure limits, lists the frequency evaluated and
+power at the antenna, and shows the applicable exposure panel(s). The United States and
+Canada have controlled and uncontrolled panels; other regions have a general-public
+panel and state that a controlled tier is not applicable. Reports also include the
+region's notes, including when a field-strength limit is represented by its plane-wave
+equivalent. The report flags any distance under 20 cm. The HTML uses inline styling only
+(no external files, scripts or network access), and all text is escaped. The PDF lays
+available environments side by side, keeps each band's section on a single page, and uses
+the standard Helvetica font, so nothing is embedded; characters outside the Windows
+Latin-1 set print as `?`.
 
 ## How it calculates
 
 1. Pick the frequency: the one you typed, or each selected band's most conservative frequency.
 2. Look up the limit for that frequency and environment in the region's table (47 CFR 1.1310 in the US).
 3. Reduce transmitter power by the feedline loss at that frequency.
-4. Time-average the power over the region's averaging period (see Results) using your duty cycle and
-   transmit/receive pattern. The transmit/receive cycle is repeated across the period,
-   counting a partial final cycle, exactly as the ARRL calculator does.
+4. Time-average the power over the region's averaging period (see Results) using your duty
+   cycle and transmit/receive pattern. The transmit/receive cycle is repeated across the
+   period, counting a partial final cycle; for the United States this matches the ARRL
+   calculator.
 5. EIRP = averaged power × 10^(gain/10).
 6. Distance = √(G × EIRP / (π × limit)), where G is 0.64 with ground reflection and 0.25
    without (equivalent to a reflection factor of 2.56 on 1/(4πR²)).
@@ -154,7 +161,7 @@ nothing is embedded; characters outside the Windows Latin-1 set print as `?`.
 
 | Path | Purpose |
 |------|---------|
-| `src/antennacalc/limits.py` | Exposure limits for every supported region, starting with the FCC MPE table. |
+| `src/antennacalc/limits.py` | Exposure limits and averaging periods for every supported region. |
 | `src/antennacalc/calc.py` | Exposure math and mode duty cycles (no GUI). |
 | `src/antennacalc/bands.py` | Amateur band lists for every supported region. |
 | `src/antennacalc/regions.py` | Binds each region's band list to its limits and picks each band's most conservative evaluation frequency. |

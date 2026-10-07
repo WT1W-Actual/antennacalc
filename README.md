@@ -5,7 +5,9 @@ the minimum safe distance from your antenna for seven regions (United States, Ca
 Australia, Germany, France, Italy and Europe (CEPT)), using each region's own exposure
 limits and the far-field method of FCC OET Bulletin 65. The United States and Canada show
 controlled and uncontrolled limits; the other regions show the general-public limit only.
-Every source is listed in [docs/SOURCES.md](docs/SOURCES.md). US results are checked against the [ARRL RF Exposure Calculator](https://www.arrl.org/rf-exposure-calculator).
+Reports identify the selected region, applicable limits and any calculation notes. Every
+regulatory source is listed in [docs/SOURCES.md](docs/SOURCES.md). US results are checked
+against the [ARRL RF Exposure Calculator](https://www.arrl.org/rf-exposure-calculator).
 
 - Choose an antenna type (pre-fills gain and ground reflection) or enter your own gain
 - Pick a region, then evaluate one or more of its amateur bands, or a specific frequency

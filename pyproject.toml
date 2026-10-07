@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "antennacalc"
-version = "0.3.0"
-description = "Amateur radio RF exposure (FCC MPE) calculator"
+version = "0.4.0"
+description = "Amateur radio RF exposure calculator with regional limits"
 requires-python = ">=3.9"
 license = { text = "MIT" }
 
